@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.db
+
+# VSCode
+.vscode/
+
+# Environments
+.env
+.venv/
+env/
+venv/
+
+# Docker
+*.log
+data/
+.data/
+
+# Byte-compiled / optimized / DLL files
+*.so
+*.o
+*.pyc
+*.pyo
+
+# System files
+.DS_Store
+Thumbs.db

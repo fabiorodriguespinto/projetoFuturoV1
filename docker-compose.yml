@@ -1,0 +1,29 @@
+
+#version: '3.8'
+
+services:
+  api:
+    build: ./api
+    container_name: api
+    ports:
+      - "8000:8000"
+    volumes:
+      - .data:/data:z
+    depends_on:
+      - nn
+      - worker
+    restart: unless-stopped
+
+  nn:
+    build: ./nn
+    container_name: nn
+    volumes:
+      - .data:/data:z
+    restart: unless-stopped
+
+  worker:
+    build: ./worker
+    container_name: worker
+    volumes:
+      - .data:/data:z
+    restart: unless-stopped
