@@ -1,30 +1,46 @@
-# Python
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*$py.class
+
+# Caches
+*.cache
+*.log
+
+# Virtual environments
+.env/
+.venv/
+
+# SQLite DB (opcional)
 *.sqlite3
 *.db
 
-# VSCode
-.vscode/
+# Pytest
+.pytest_cache/
 
-# Environments
-.env
-.venv/
-env/
-venv/
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# VS Code / IDEs
+.vscode/
+.idea/
 
 # Docker
-*.log
-data/
+*.pid
+*.sock
+docker-compose.override.yml
+
+# Data volumes
 .data/
 
-# Byte-compiled / optimized / DLL files
-*.so
-*.o
-*.pyc
-*.pyo
+# Envs ou secrets
+.env
+.env.*
 
-# System files
+# System
 .DS_Store
 Thumbs.db
 
+# Git
+*.swp
