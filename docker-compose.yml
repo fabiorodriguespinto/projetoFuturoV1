@@ -27,3 +27,14 @@ services:
     volumes:
       - .data:/data:z
     restart: unless-stopped
+
+  db_init:
+    build:
+      context: ./init
+    container_name: init
+    depends_on:
+      - api
+    volumes:
+      - ./data:/app/data  # se o script cria arquivos em data/
+    restart: "no"
+
