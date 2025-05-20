@@ -1,19 +1,14 @@
-FROM python:3.11-slim
+FROM python:3.9-slim
 
+# Define o diretório de trabalho
 WORKDIR /app
 
-COPY . /app
+# Copia e instala as dependências Python (incluindo APScheduler no requirements.txt)
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir pandas requests
+# Copia o código da aplicação
+COPY . .
 
-# Instala o cron
-RUN apt-get update && apt-get install -y cron
-
-# Copia o arquivo de agendamento
-COPY cronjob /etc/cron.d/cronjob
-
-# Dá permissão e ativa o agendamento
-RUN chmod 0644 /etc/cron.d/cronjob && crontab /etc/cron.d/cronjob
-
-# Executa o cron em primeiro plano
-CMD ["cron", "-f"]
+# Executa o script Python principal diretamente (que deverá usar o APScheduler para agendamento)
+CMD ["python", "main.py"]
