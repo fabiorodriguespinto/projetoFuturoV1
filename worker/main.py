@@ -2,6 +2,7 @@
 
 import sqlite3
 from datetime import datetime
+from worker.tasks.retrain_model import executar_retreinamento
 # após chamada à inferência
 price = prediction["prediction"]
 day_of_year = datetime.now().timetuple().tm_yday
@@ -12,3 +13,6 @@ cursor.execute("CREATE TABLE IF NOT EXISTS predictions (id INTEGER PRIMARY KEY A
 cursor.execute("INSERT INTO predictions (price, day_of_year, created_at) VALUES (?, ?, ?)", (price, day_of_year, datetime.utcnow().isoformat()))
 conn.commit()
 conn.close()
+
+
+executar_retreinamento()

@@ -1,4 +1,3 @@
-
 #version: '3.8'
 
 services:
@@ -13,13 +12,18 @@ services:
       - nn
       - worker
     restart: unless-stopped
+    env_file:
+      - .env
 
   nn:
     build: ./nn
     container_name: nn
     volumes:
       - .data:/data:z
+      - ./nn/models:/app/models
     restart: unless-stopped
+    env_file:
+      - .env
 
   worker:
     build: ./worker
@@ -27,6 +31,8 @@ services:
     volumes:
       - .data:/data:z
     restart: unless-stopped
+    env_file:
+      - .env
 
   db_init:
     build:
@@ -35,6 +41,7 @@ services:
     depends_on:
       - api
     volumes:
-      - ./data:/app/data  # se o script cria arquivos em data/
+      - ./data:/app/data
     restart: "no"
-
+    env_file:
+      - .env
