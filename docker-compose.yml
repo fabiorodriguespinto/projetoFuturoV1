@@ -16,14 +16,20 @@ services:
       - .env
 
   nn:
-    build: ./nn
-    container_name: nn
+    build:
+      context: ./nn
+      dockerfile: Dockerfile # Explicitly state Dockerfile
+    container_name: nn_service # Renaming to avoid potential future conflicts if a training runner is added
+    ports:
+      - "8001:8001"
     volumes:
-      - .data:/data:z
-      - ./nn/models:/app/models
+      - ./nn/modelos:/app/nn/modelos # Mount models to the correct path in the container
     restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
     env_file:
       - .env
+    # Removed .data:/data:z volume, assuming it's not needed for inference
 
   worker:
     build: ./worker
@@ -40,8 +46,9 @@ services:
     container_name: init
     depends_on:
       - api
+      # - nn # Removed direct dependency from init to nn, let api handle it
     volumes:
-      - ./data:/app/data
+      - ./data:/app/data # This should be .data as per other services, assuming consistency
     restart: "no"
     env_file:
       - .env

@@ -3,8 +3,8 @@
 O **Projeto_FuturoV1** é uma aplicação modular baseada em contêineres Docker, composta por três serviços principais:
 
 - **API (FastAPI)**: expõe uma interface HTTP para inferência de dados.
-- **Worker**: agenda tarefas recorrentes para execução e grava dados em um banco local.
-- **NN (Neural Network)**: executa inferência com base em um modelo predefinido.
+- **Worker**: agenda tarefas recorrentes para execution e grava dados em um banco local.
+- **NN (Neural Network)**: É um serviço FastAPI que carrega um modelo treinado (Linear Regression baseado no dia do ano para prever o preço do Bitcoin) e expõe um endpoint para fornecer previsões.
 
 ## Arquitetura
 
@@ -28,17 +28,18 @@ Projeto_FuturoV1/
 - **Porta exposta**: `8000`
 - **Endpoints principais**:
   - `GET /healthcheck` → Verifica se a API está ativa
-  - `POST /predictions` → Recebe requisições e consulta a NN
+  - `POST /predictions` → Recebe um JSON com `{'day_of_year': int}`. Consulta o serviço NN para obter uma nova previsão e a retorna.
 
 ### 🔹 Worker (Agendador)
 - **Local**: `worker/`
 - **Imagem**: `projeto_futurov1-worker`
-- **Função**: Roda a cada intervalo (via cron ou APScheduler) e grava previsões em `/data/app.db`
+- **Função**: Periodicamente (conforme configurado, ex: via cron) busca o dia do ano atual, solicita uma previsão ao serviço NN e grava o resultado em `/data/app.db`. Também pode acionar o re-treinamento do modelo.
 
 ### 🔹 NN (Rede Neural)
 - **Local**: `nn/`
-- **Imagem**: `projeto_futurov1-nn`
-- **Função**: Recebe chamadas da API e retorna previsões simuladas ou reais.
+- **Imagem**: `projeto_futurov1-nn` (Nota: o nome da imagem pode ser `nn_service` ou similar dependendo do `docker-compose.yml`)
+- **Função**: Serviço FastAPI rodando na porta 8001. Carrega o modelo `modelo_btc.pkl` (regressão linear que usa o dia do ano para prever o preço do BTC) e fornece previsões através do endpoint `POST /predict` (interno ao sistema Docker). É chamado pela API e pelo Worker.
+- **Porta exposta (container)**: `8001`
 
 ---
 
@@ -103,7 +104,7 @@ Endpoints principais
 | Método | Rota               | Descrição                                      |
 |--------|--------------------|-----------------------------------------------|
 | GET    | `/healthcheck`     | Verifica se a API está no ar                  |
-| POST   | `/predictions`     | Recebe parâmetros, aciona o serviço NN e retorna a previsão |
+| POST   | `/predictions`     | Recebe um JSON no corpo da requisição com `{'day_of_year': int}`. Aciona o serviço NN para obter uma nova previsão e a retorna diretamente. |
 
 
 Segurança

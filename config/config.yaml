@@ -1,1 +1,2 @@
 app_name: ProjetoFuturo
+nn_service_url: "http://nn_service:8001/predict"
