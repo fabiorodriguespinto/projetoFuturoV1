@@ -1,1 +1,2 @@
-print('Treinando modelo...')
+def treinar_modelo():
+    print("Treinando modelo...")

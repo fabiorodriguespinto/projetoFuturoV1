@@ -1,4 +1,4 @@
-# scripts/coleta/coleta_cripto.py
+## worker/tasks/coleta_cripto.py
 import requests
 import pandas as pd
 from datetime import datetime
@@ -44,3 +44,7 @@ if __name__ == "__main__":
         intervalo=args.intervalo,
         output_path=args.saida
     )
+
+def executar_coleta(ativo='bitcoin', dias=30, intervalo='daily', output_path='data/input'):
+    coletar_dados(ativo=ativo, dias=dias, intervalo=intervalo, output_path=output_path)
+

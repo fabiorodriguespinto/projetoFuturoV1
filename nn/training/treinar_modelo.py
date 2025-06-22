@@ -18,5 +18,5 @@ with open('nn/modelos/modelo_btc.pkl', 'wb') as f:
 print("Modelo treinado e salvo em nn/modelos/modelo_btc.pkl")
 
 # Enviar notificação ao finalizar
-from shared.notifications import notificar_telegram
+from shared.telegram_bot import notificar_telegram
 notificar_telegram("Re-treinamento finalizado com sucesso!")

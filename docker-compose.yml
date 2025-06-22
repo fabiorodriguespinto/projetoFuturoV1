@@ -7,32 +7,41 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .data:/data:z
+      - ./data:/data:z
     depends_on:
       - nn
       - worker
     restart: unless-stopped
     env_file:
       - .env
+    networks:
+      - appnet
 
   nn:
     build: ./nn
     container_name: nn
     volumes:
-      - .data:/data:z
+      - ./data:/data:z
       - ./nn/models:/app/models
     restart: unless-stopped
     env_file:
       - .env
+    networks:
+      - appnet
 
   worker:
     build: ./worker
     container_name: worker
     volumes:
-      - .data:/data:z
+      - ./data:/data:z
+      - ./nn:/app/nn
+      - ./scripts:/app/scripts
+      - ./shared:/app/shared
     restart: unless-stopped
     env_file:
       - .env
+    networks:
+      - appnet
 
   db_init:
     build:
@@ -45,3 +54,9 @@ services:
     restart: "no"
     env_file:
       - .env
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge

@@ -1,3 +1,5 @@
+##worker/tasks/retrain_model,py
+
 from nn.training.train import treinar_modelo
 
 def executar_retreinamento():

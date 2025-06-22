@@ -1,7 +1,18 @@
 from fastapi import APIRouter
+from pydantic import BaseModel
 import sqlite3
 
 router = APIRouter()
+
+# Entrada para simulação de inferência
+class InputData(BaseModel):
+    input_data: str
+
+@router.post("/predict")
+def predict(data: InputData):
+    # Aqui você pode substituir pela inferência real no futuro
+    # Por ora, apenas simula um valor
+    return {"prediction": 34210.45}
 
 @router.get("/predictions")
 def get_predictions(limit: int = 10):

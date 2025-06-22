@@ -1,6 +1,6 @@
 import pytest
 from worker.main import coletar_dados, processar_dados
-from shared.notifications import notificar_telegram
+from shared.telegram_bot import notificar_telegram
 
 # Teste 1: coleta de dados deve retornar uma lista de dicts válidos
 def test_coletar_dados_retorna_dados_validos():
