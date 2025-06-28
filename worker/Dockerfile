@@ -4,8 +4,8 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Copia e instala as dependências Python (incluindo APScheduler no requirements.txt)
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements_worker.txt ./
+RUN pip install --no-cache-dir -r requirements_worker.txt
 
 # Copia o código da aplicação
 COPY . .
