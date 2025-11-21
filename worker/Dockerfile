@@ -1,14 +1,25 @@
-FROM python:3.9-slim
+##worker/Dockerfile
+# Dockerfile da WORKER
 
-# Define o diretório de trabalho
-WORKDIR /app
+FROM python:3.11
 
-# Copia e instala as dependências Python (incluindo APScheduler no requirements.txt)
-COPY requirements_worker.txt ./
-RUN pip install --no-cache-dir -r requirements_worker.txt
+WORKDIR /worker
 
-# Copia o código da aplicação
-COPY . .
+# Copia apenas arquivos do worker sem sobrescrever o shared
+COPY worker/main.py /worker/main.py
+COPY worker/requirements.txt /worker/requirements.txt
+COPY worker/market_collector.py /worker/market_collector.py
+COPY worker/tasks /worker/tasks
 
-# Executa o script Python principal diretamente (que deverá usar o APScheduler para agendamento)
+# Copia shared corretamente
+COPY shared /worker/shared
+
+# Copia a neural_network
+COPY neural_network /worker/neural_network
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+ENV PYTHONPATH="/worker"
+
 CMD ["python", "main.py"]
+

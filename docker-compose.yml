@@ -1,67 +1,122 @@
-
-##/opt/Projetos/Projeto_FuturoV1/docker-compose.yml
-
-#version: '3.8'
-
 services:
+  db:
+    image: postgres:15
+    container_name: postgres
+    restart: always
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    ports:
+      - "5432:5432"
+
+  db_init:
+    container_name: futurov1_db_init
+    build:
+      context: .
+      dockerfile: init/Dockerfile
+    depends_on:
+      - db
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    networks:
+      - backend
+
   api:
+    container_name: futurov1_api
     build:
       context: .
       dockerfile: api/Dockerfile
-    container_name: api
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    volumes:
+      - ./shared:/shared
+      - ./neural_network:/neural_network  
+    depends_on:
+      - db
+      - db_init
+    networks:
+      - backend
     ports:
       - "8000:8000"
-    volumes:
-      - ./data:/data:z
-    depends_on:
-      - nn
-      - worker
-    restart: unless-stopped
-    env_file:
-      - .env
-    networks:
-      - appnet
-
-  nn:
-    build: ./nn
-    container_name: nn
-    volumes:
-      - ./data:/data:z
-      - ./nn/models:/app/models
-    restart: unless-stopped
-    env_file:
-      - .env
-    networks:
-      - appnet
 
   worker:
-    build: ./worker
-    container_name: worker
-    volumes:
-      - ./data:/data:z
-      - ./nn:/app/nn
-      - ./scripts:/app/scripts
-      - ./shared:/app/shared
-    restart: unless-stopped
-    env_file:
-      - .env
-    networks:
-      - appnet
-
-  db_init:
+    container_name: futurov1_worker
     build:
-      context: ./init
-    container_name: init
+      context: .
+      dockerfile: worker/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+    volumes:
+      - ./shared:/shared
+      - ./neural_network:/neural_network  
     depends_on:
       - api
-    volumes:
-      - ./data:/app/data
-    restart: "no"
-    env_file:
-      - .env
+      - db
     networks:
-      - appnet
+      - backend
+
+  grafana:
+    image: grafana/grafana
+    container_name: futurov1_grafana
+    env_file: .env
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - db
+    networks:
+      - backend
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: futurov1_pgadmin
+    env_file: .env
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASS}
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - backend
+    depends_on:
+      - db
+
+  heimdall:
+    image: linuxserver/heimdall
+    container_name: futurov1_heimdall
+    env_file: .env
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: America/Sao_Paulo
+    ports:
+      - "8090:80"
+    volumes:
+      - heimdall_data:/config
+    networks:
+      - backend
 
 networks:
-  appnet:
-    driver: bridge
+  backend:
+
+volumes:
+  postgres_data:
+  grafana_data:
+  pgadmin_data:
+  heimdall_data:

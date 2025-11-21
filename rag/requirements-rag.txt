@@ -1,9 +1,0 @@
-llama-index==0.10.28
-llama-index-core==0.10.68.post1
-llama-index-embeddings-huggingface==0.1.10
-sentence-transformers==2.6.1
-openai
-tiktoken
-tqdm
-python-dotenv
-

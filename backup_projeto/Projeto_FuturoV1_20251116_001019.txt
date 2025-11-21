@@ -1,0 +1,1978 @@
+==============================
+📁 Estrutura de diretórios :: /opt/Projetos/Projeto_FuturoV1
+Gerado: 2025-11-16 00:10:19-03:00
+==============================
+
+.
+├── api
+│   ├── app
+│   │   ├── main.py
+│   │   ├── models
+│   │   │   ├── __init__.py
+│   │   │   └── models.py
+│   │   ├── routers
+│   │   │   ├── .gitignore
+│   │   │   ├── healthcheck.py
+│   │   │   ├── __init__.py
+│   │   │   └── predict.py
+│   │   └── services
+│   │       ├── database.py
+│   │       └── __init__.py
+│   ├── Dockerfile
+│   └── requirements_api.txt
+├── config
+│   └── config.yaml
+├── data
+│   ├── app.db
+│   ├── input
+│   │   ├── bitcoin_5m.csv
+│   │   ├── bitcoin_daily_30d.csv
+│   │   └── .gitkeep
+│   ├── modelo
+│   ├── output
+│   │   └── .gitkeep
+│   └── trades.db
+├── debug_updates.py
+├── docker-compose.yml
+├── .env
+├── estrutura_projeto_20251115_234713.txt
+├── .gitignore
+├── init
+│   ├── db_init.py
+│   └── Dockerfile
+├── nn
+│   ├── Dockerfile
+│   ├── inference
+│   │   └── predict.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   └── models.py
+│   ├── requirements_nn.txt
+│   └── training
+│       ├── __init__.py
+│       ├── train_bkp2.py
+│       ├── train_bkp3.py
+│       ├── train_linear.py
+│       ├── train.py
+│       ├── train_rf.py
+│       ├── train_xgb.py
+│       ├── treinar_modelo.py
+│       └── utils.py
+├── README.md
+├── requirements.txt
+├── resume_files.sh
+├── scripts
+│   ├── bin
+│   │   ├── iniciar.sh
+│   │   └── start_all.sh
+│   └── coleta
+│       └── coleta_cripto.py
+├── shared
+│   ├── config.py
+│   ├── database.py
+│   ├── __init__.py
+│   ├── models.py
+│   ├── telegram_bot_old.py
+│   └── telegram_bot.py
+├── test_telegram.py
+└── worker
+    ├── cronjob
+    ├── Dockerfile
+    ├── main.py
+    ├── requirements_worker.txt
+    └── tasks
+        ├── coleta_cripto_bkp1.py
+        ├── coleta_cripto.py
+        ├── __init__.py
+        └── retrain_model.py
+
+22 directories, 60 files
+
+==============================
+📄 Conteúdo dos arquivos
+==============================
+
+----------------------------------------
+Arquivo: ./api/app/routers/__init__.py
+----------------------------------------
+# Router init
+
+----------------------------------------
+Arquivo: ./api/app/routers/predict.py
+----------------------------------------
+##api/app/routers/predict.py
+
+from fastapi import APIRouter
+from nn.inference.predict import prever  # novo import
+
+router = APIRouter()
+
+@router.post("/predict")
+def predict():
+    try:
+        valor = prever()
+        return {"prediction": valor}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+----------------------------------------
+Arquivo: ./api/app/routers/healthcheck.py
+----------------------------------------
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+----------------------------------------
+Arquivo: ./api/app/routers/.gitignore
+----------------------------------------
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.db
+
+# VSCode
+.vscode/
+
+# Environments
+.env
+.venv/
+env/
+venv/
+
+# Docker
+*.log
+data/
+.data/
+
+# Byte-compiled / optimized / DLL files
+*.so
+*.o
+*.pyc
+*.pyo
+
+# System files
+.DS_Store
+Thumbs.db
+
+----------------------------------------
+Arquivo: ./api/app/models/__init__.py
+----------------------------------------
+# Models init
+
+----------------------------------------
+Arquivo: ./api/app/models/models.py
+----------------------------------------
+# Modelos agora estão em shared/models.py
+
+#from sqlalchemy import Column, Integer, Float, DateTime
+#from app.services.database import Base
+#from datetime import datetime
+
+#class PredictionResult(Base):
+#    __tablename__ = "predictions"
+
+#    id = Column(Integer, primary_key=True, index=True)
+#    #price = Column(Float)
+#    #day_of_year = Column(Integer)
+#    #created_at = Column(DateTime, default=datetime.utcnow)
+#    symbol = Column(String)
+#    prediction = Column(Float)
+
+----------------------------------------
+Arquivo: ./api/app/services/__init__.py
+----------------------------------------
+# Services init
+
+----------------------------------------
+Arquivo: ./api/app/services/database.py
+----------------------------------------
+# api/app/services/database.py
+from shared.database import SessionLocal, engine, Base
+
+----------------------------------------
+Arquivo: ./api/app/main.py
+----------------------------------------
+##api/main.py
+
+from fastapi import FastAPI
+from app.routers import predict, healthcheck
+
+app = FastAPI()
+
+app.include_router(predict.router)
+app.include_router(healthcheck.router)
+
+@app.get("/")
+def root():
+    return {"message": "API OK"}
+
+----------------------------------------
+Arquivo: ./api/Dockerfile
+----------------------------------------
+##api/Dockerfile
+# Dockerfile da API
+
+FROM python:3.11-slim
+
+# Variáveis de ambiente recomendadas
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Define o diretório de trabalho
+WORKDIR /app
+
+# Copia os arquivos da aplicação
+COPY api/app /app/app
+
+# ⚠️ Copia também a pasta nn (necessário para importar nn.inference.predict)
+COPY nn /app/nn
+
+# Copia o requirements.txt
+COPY api/requirements_api.txt .
+
+# Instala as dependências
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements_api.txt
+
+# Expõe a porta da API
+EXPOSE 8000
+
+# Comando para iniciar o servidor FastAPI com Uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+
+
+----------------------------------------
+Arquivo: ./api/requirements_api.txt
+----------------------------------------
+fastapi
+uvicorn[standard]==0.30.1
+sqlalchemy
+aiosqlite
+scikit-learn==1.6.1
+pandas
+joblib
+
+----------------------------------------
+Arquivo: ./nn/training/train.py
+----------------------------------------
+##nn/training/train.py
+
+from .train_linear import treinar_modelo_linear
+from .train_rf import treinar_modelo_rf
+from .train_xgb import treinar_modelo_xgb
+
+def treinar_todos_modelos():
+    treinar_modelo_linear()
+    treinar_modelo_rf()
+    treinar_modelo_xgb()
+
+
+
+
+----------------------------------------
+Arquivo: ./nn/training/__init__.py
+----------------------------------------
+# Training init
+
+----------------------------------------
+Arquivo: ./nn/training/treinar_modelo.py
+----------------------------------------
+# nn/training/treinar_modelo.py
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import pickle
+
+df = pd.read_csv('dados/btc.csv')
+df['timestamp'] = pd.to_datetime(df['timestamp'])
+df['dia'] = df['timestamp'].dt.dayofyear
+X = df[['dia']]
+y = df['price']
+
+modelo = LinearRegression()
+modelo.fit(X, y)
+
+with open('nn/modelos/modelo_btc.pkl', 'wb') as f:
+    pickle.dump(modelo, f)
+
+print("Modelo treinado e salvo em nn/modelos/modelo_btc.pkl")
+
+# Enviar notificação ao finalizar
+from shared.telegram_bot import notificar_telegram
+notificar_telegram("Re-treinamento finalizado com sucesso!")
+
+----------------------------------------
+Arquivo: ./nn/training/train_bkp2.py
+----------------------------------------
+##nn/training/train.py
+
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import joblib
+import os
+
+def treinar_modelo():
+    print("📚 Iniciando treinamento do modelo...")
+
+    # Caminho para o arquivo CSV
+    csv_path = "/data/input/bitcoin_daily_30d.csv"
+    df = pd.read_csv(csv_path)
+
+    # Garante que os dados necessários estão presentes
+    features = ["open", "high", "low", "volume"]
+    target = "close"  # Previsão do preço de fechamento
+
+    for coluna in features + [target]:
+        if coluna not in df.columns:
+            raise ValueError(f"Coluna obrigatória ausente: {coluna}")
+
+    # Remove possíveis NaNs
+    df.dropna(subset=features + [target], inplace=True)
+
+    # Separa X e y
+    X = df[features]
+    y = df[target]
+
+    # Treina o modelo
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+
+    # Salva o modelo
+    os.makedirs("/data/modelo", exist_ok=True)
+    joblib.dump(modelo, "/data/modelo/modelo.pkl")
+    print("✅ Modelo treinado e salvo em /data/modelo/modelo.pkl")
+
+
+----------------------------------------
+Arquivo: ./nn/training/train_bkp3.py
+----------------------------------------
+##nn/training/train.py
+
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import joblib
+import os
+from datetime import datetime
+from shared import config
+
+def treinar_modelo():
+    print("🤖 Iniciando treinamento do modelo...")
+
+    # Carrega os dados
+    df = pd.read_csv(config.CAMINHO_DADOS)
+
+    # Gera as novas features
+    df["dia"] = pd.to_datetime(df["open_time"]).dt.dayofyear
+    df["media"] = (df["high"] + df["low"]) / 2
+    df["var_percent"] = ((df["high"] - df["low"]) / df["open"]) * 100
+
+    # Define as features e variável alvo
+    X = df[["open", "high", "low", "volume", "dia", "media", "var_percent"]]
+    y = df["close"]
+
+    # Treinamento
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+
+    # Gera nome com timestamp
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    nome_arquivo = f"modelo_{timestamp}.pkl"
+    caminho_modelo = os.path.join(config.DIRETORIO_MODELO, nome_arquivo)
+
+    # Salva o modelo
+    os.makedirs(config.DIRETORIO_MODELO, exist_ok=True)
+    joblib.dump(modelo, caminho_modelo)
+    print(f"✅ Modelo salvo em: {caminho_modelo}")
+
+    # Cria/atualiza o link simbólico
+    link_simbolico = os.path.join(config.DIRETORIO_MODELO, "modelo_mais_recente.pkl")
+    if os.path.islink(link_simbolico) or os.path.exists(link_simbolico):
+        os.remove(link_simbolico)
+    os.symlink(nome_arquivo, link_simbolico)
+    print(f"🔗 Link simbólico criado: {link_simbolico} -> {nome_arquivo}")
+
+
+
+----------------------------------------
+Arquivo: ./nn/training/train_linear.py
+----------------------------------------
+##nn/training/train_linear.py
+
+from sklearn.linear_model import LinearRegression
+import joblib, os
+from datetime import datetime
+from shared import config
+from .utils import preparar_dados
+
+def treinar_modelo_linear():
+    X, y = preparar_dados()
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+
+    caminho = os.path.join(config.DIRETORIO_MODELOS, f"linear_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pkl")
+    joblib.dump(modelo, caminho)
+    print(f"✅ Modelo Linear salvo em: {caminho}")
+
+
+----------------------------------------
+Arquivo: ./nn/training/train_rf.py
+----------------------------------------
+##nn/training/train_rf.py
+
+from sklearn.ensemble import RandomForestRegressor
+import joblib, os
+from datetime import datetime
+from shared import config
+from .utils import preparar_dados
+
+def treinar_modelo_rf():
+    X, y = preparar_dados()
+    modelo = RandomForestRegressor(n_estimators=100, random_state=42)
+    modelo.fit(X, y)
+
+    caminho = os.path.join(config.DIRETORIO_MODELOS, f"rf_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pkl")
+    joblib.dump(modelo, caminho)
+    print(f"✅ Modelo RF salvo em: {caminho}")
+
+
+----------------------------------------
+Arquivo: ./nn/training/train_xgb.py
+----------------------------------------
+from xgboost import XGBRegressor
+import joblib, os
+from datetime import datetime
+from shared import config
+from .utils import preparar_dados
+
+def treinar_modelo_xgb():
+    X, y = preparar_dados()
+    modelo = XGBRegressor(n_estimators=100, random_state=42)
+    modelo.fit(X, y)
+
+    caminho = os.path.join(config.DIRETORIO_MODELOS, f"xgb_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pkl")
+    joblib.dump(modelo, caminho)
+    print(f"✅ Modelo XGBoost salvo em: {caminho}")
+
+
+----------------------------------------
+Arquivo: ./nn/training/utils.py
+----------------------------------------
+##nn/training/utils.py
+
+import pandas as pd
+from shared import config
+
+def preparar_dados():
+    df = pd.read_csv(config.CAMINHO_DADOS)
+
+    df["dia"] = pd.to_datetime(df["open_time"]).dt.dayofyear
+    df["media"] = (df["high"] + df["low"]) / 2
+    df["var_percent"] = ((df["high"] - df["low"]) / df["open"]) * 100
+    df["target"] = df["close"].shift(-config.ANTECEDENCIA_CANDLES)
+    df.dropna(inplace=True)
+
+    X = df[["open", "high", "low", "volume", "dia", "media", "var_percent"]]
+    y = df["target"]
+    return X, y
+
+
+
+
+----------------------------------------
+Arquivo: ./nn/Dockerfile
+----------------------------------------
+FROM python:3.11-slim
+WORKDIR /app
+COPY ./training /app
+RUN pip install --no-cache-dir scikit-learn pandas numpy
+CMD ["python", "train.py"]
+
+
+----------------------------------------
+Arquivo: ./nn/models/__init__.py
+----------------------------------------
+# Models NN init
+
+----------------------------------------
+Arquivo: ./nn/models/models.py
+----------------------------------------
+from sqlalchemy import Column, Integer, String, Float
+from app.services.database import Base
+
+class TradeModel(Base):
+    __tablename__ = "trades"
+
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String)
+    prediction = Column(Float)
+
+
+----------------------------------------
+Arquivo: ./nn/inference/predict.py
+----------------------------------------
+# nn/inference/predict.py
+
+import pandas as pd
+import joblib
+import os
+import glob
+from shared import config
+
+def carregar_modelos():
+    modelos = {}
+    arquivos = glob.glob(os.path.join(config.DIRETORIO_MODELOS, "*.pkl"))
+    for caminho in arquivos:
+        nome = os.path.basename(caminho)
+        if nome.startswith("linear_"):
+            modelos["Linear Regression"] = joblib.load(caminho)
+        elif nome.startswith("rf_"):
+            modelos["Random Forest"] = joblib.load(caminho)
+        elif nome.startswith("xgb_"):
+            modelos["XGBoost"] = joblib.load(caminho)
+    return modelos
+
+def prever():
+    if not os.path.exists(config.CAMINHO_DADOS):
+        raise FileNotFoundError("❌ Dados de entrada não encontrados!")
+
+    df = pd.read_csv(config.CAMINHO_DADOS)
+    
+    # Adiciona as features
+    df["dia"] = pd.to_datetime(df["open_time"]).dt.dayofyear
+    df["media"] = (df["high"] + df["low"]) / 2
+    df["var_percent"] = ((df["high"] - df["low"]) / df["open"]) * 100
+
+    ultima_linha = df[["open", "high", "low", "volume", "dia", "media", "var_percent"]].iloc[-1:]
+
+    # Carrega os modelos
+    modelos = carregar_modelos()
+    if not modelos:
+        raise RuntimeError("❌ Nenhum modelo encontrado para previsão!")
+
+    previsoes = {}
+    for nome, modelo in modelos.items():
+        try:
+            valor = float(modelo.predict(ultima_linha)[0])
+            previsoes[nome] = valor
+        except Exception as e:
+            previsoes[nome] = f"Erro: {e}"
+
+    # Escolha simples: média das previsões válidas
+    valores_validos = [v for v in previsoes.values() if isinstance(v, (int, float))]
+    previsao_final = round(sum(valores_validos) / len(valores_validos), 2) if valores_validos else 0.0
+
+    return previsao_final, previsoes
+
+
+
+
+----------------------------------------
+Arquivo: ./nn/requirements_nn.txt
+----------------------------------------
+scikit-learn==1.5.0
+xboost==2.0.3
+pandas==2.2.2
+joblib==1.4.2
+
+----------------------------------------
+Arquivo: ./worker/Dockerfile
+----------------------------------------
+FROM python:3.9-slim
+
+# Define o diretório de trabalho
+WORKDIR /app
+
+# Copia e instala as dependências Python (incluindo APScheduler no requirements.txt)
+COPY requirements_worker.txt ./
+RUN pip install --no-cache-dir -r requirements_worker.txt
+
+# Copia o código da aplicação
+COPY . .
+
+# Executa o script Python principal diretamente (que deverá usar o APScheduler para agendamento)
+CMD ["python", "main.py"]
+
+
+----------------------------------------
+Arquivo: ./worker/tasks/__init__.py
+----------------------------------------
+# Tasks init
+
+----------------------------------------
+Arquivo: ./worker/tasks/retrain_model.py
+----------------------------------------
+##worker/tasks/retrain_model,py
+
+from nn.training.train import treinar_modelo
+
+def executar_retreinamento():
+    print("Iniciando re-treinamento do modelo...")
+    treinar_modelo()
+    print("Re-treinamento finalizado.")
+
+
+----------------------------------------
+Arquivo: ./worker/tasks/coleta_cripto.py
+----------------------------------------
+# worker/tasks/coleta_cripto.py
+
+import requests
+import pandas as pd
+import os
+from datetime import datetime
+from shared import config
+
+def executar_coleta():
+    print(f"📥 Coletando dados de {config.ATIVO}...")
+
+    # 🧭 Mapeamento dos nomes comuns para os símbolos reais da Binance
+    mapa_ativos = {
+        "bitcoin": "BTC",
+        "ethereum": "ETH",
+        "bnb": "BNB",
+        # adicione mais conforme necessário
+    }
+
+    simbolo_base = mapa_ativos.get(config.ATIVO.lower(), config.ATIVO.upper())
+    simbolo = f"{simbolo_base}USDT"
+
+    # 🔁 Mapeamento dos intervalos
+    mapa_intervalos = {
+        "daily": "1d",
+        "1m": "1m",
+        "5m": "5m",
+        "15m": "15m",
+        "1h": "1h"
+    }
+    binance_interval = mapa_intervalos.get(config.INTERVALO, config.INTERVALO)
+
+    url = "https://api.binance.com/api/v3/klines"
+    params = {
+        "symbol": simbolo,
+        "interval": binance_interval,
+        "limit": config.QUANTIDADE_CANDLES
+    }
+
+    resp = requests.get(url, params=params)
+    resp.raise_for_status()
+
+    dados = resp.json()
+
+    colunas = [
+        "open_time", "open", "high", "low", "close", "volume",
+        "_1", "_2", "_3", "_4", "_5", "_6"
+    ]
+    df = pd.DataFrame(dados, columns=colunas)
+
+    df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+    df = df[["open_time", "open", "high", "low", "close", "volume"]]
+    df = df.astype({
+        "open": float, "high": float, "low": float,
+        "close": float, "volume": float
+    })
+
+    os.makedirs(os.path.dirname(config.CAMINHO_DADOS), exist_ok=True)
+    df.to_csv(config.CAMINHO_DADOS, index=False)
+    print(f"✅ Dados salvos em: {config.CAMINHO_DADOS}")
+
+
+----------------------------------------
+Arquivo: ./worker/tasks/coleta_cripto_bkp1.py
+----------------------------------------
+## worker/tasks/coleta_cripto.py
+import requests
+import pandas as pd
+from datetime import datetime
+import os
+import argparse
+
+def coletar_dados(ativo='bitcoin', vs_currency='usd', dias=30, intervalo='daily', output_path='data/input'):
+    url = f'https://api.coingecko.com/api/v3/coins/{ativo}/market_chart'
+    params = {
+        'vs_currency': vs_currency,
+        'days': dias,
+        'interval': intervalo
+    }
+
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+
+        prices = pd.DataFrame(data['prices'], columns=["timestamp", "price"])
+        prices['timestamp'] = pd.to_datetime(prices['timestamp'], unit='ms')
+
+        os.makedirs(output_path, exist_ok=True)
+        caminho_saida = os.path.join(output_path, f"{ativo}_{intervalo}_{dias}d.csv")
+        prices.to_csv(caminho_saida, index=False)
+        print(f"✅ Dados salvos em: {caminho_saida}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Erro ao coletar dados de {ativo}: {e}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Coleta de dados de criptomoedas via CoinGecko")
+    parser.add_argument('--ativo', type=str, default='bitcoin', help='Nome do ativo (ex: bitcoin, ethereum)')
+    parser.add_argument('--dias', type=int, default=30, help='Quantos dias de histórico')
+    parser.add_argument('--intervalo', type=str, default='daily', choices=['minutely', 'hourly', 'daily'], help='Intervalo de dados')
+    parser.add_argument('--saida', type=str, default='data/input', help='Diretório de saída')
+
+    args = parser.parse_args()
+
+    coletar_dados(
+        ativo=args.ativo,
+        dias=args.dias,
+        intervalo=args.intervalo,
+        output_path=args.saida
+    )
+
+def executar_coleta(ativo='bitcoin', dias=30, intervalo='daily', output_path='data/input'):
+    coletar_dados(ativo=ativo, dias=dias, intervalo=intervalo, output_path=output_path)
+
+
+
+----------------------------------------
+Arquivo: ./worker/main.py
+----------------------------------------
+##worker/main.py
+
+import sqlite3
+from datetime import datetime
+from apscheduler.schedulers.blocking import BlockingScheduler
+from tasks.retrain_model import executar_retreinamento
+from tasks.coleta_cripto import executar_coleta
+import requests
+from shared.telegram_bot import enviar_mensagem
+import sys
+import os
+import pandas as pd
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import threading
+from shared.telegram_bot import enviar_mensagem, escutar_comandos_telegram
+from shared import config
+
+def coletar_e_salvar_dados():
+    executar_coleta()
+
+def executar_inferencia():
+    try:
+        response = requests.post("http://api:8000/predict", json={"input_data": "exemplo"}, timeout=10)
+        response.raise_for_status()
+        prediction = response.json()
+        return prediction.get("prediction", 0.0)
+    except Exception as e:
+        print(f"❌ Erro na inferência: {e}")
+        return -1.0
+
+def registrar_previsao(price: float):
+    day_of_year = datetime.now().timetuple().tm_yday
+    conn = sqlite3.connect("/data/app.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS predictions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            price REAL,
+            day_of_year INT,
+            created_at TEXT
+        )
+    """)
+    cursor.execute("""
+        INSERT INTO predictions (price, day_of_year, created_at)
+        VALUES (?, ?, ?)
+    """, (price, day_of_year, datetime.utcnow().isoformat()))
+    conn.commit()
+    conn.close()
+
+def realizar_analise():
+    print("🚀 Iniciando análise...")  # ADICIONE
+    enviar_mensagem("⏱ Executando análise manual agora...")
+
+    try:
+        coletar_e_salvar_dados()
+        print("✅ Coleta realizada com sucesso")  # ADICIONE
+    except Exception as e:
+        print(f"❌ Erro na coleta: {e}")
+        enviar_mensagem(f"❌ Erro na coleta de dados: {e}")
+        return
+
+    try:
+        previsao, previsoes_modelos = executar_inferencia()
+        print(f"✅ Previsão: {previsao}")  # ADICIONE
+    except Exception as e:
+        print(f"❌ Erro na inferência: {e}")
+        enviar_mensagem(f"❌ Erro na inferência: {e}")
+        return
+
+    try:
+        df = pd.read_csv("/data/input/bitcoin_daily_30d.csv")
+        preco_real = float(df["close"].iloc[-1])
+        print(f"✅ Preço real: {preco_real}")  # ADICIONE
+    except Exception as e:
+        print(f"❌ Erro ao ler CSV: {e}")
+        enviar_mensagem(f"❌ Erro ao ler preço real: {e}")
+        return
+
+    tipo_operacao = simular_operacao(preco_real, previsao)
+    registrar_previsao(previsao)
+    registrar_operacao(tipo_operacao, preco_real, previsao)
+
+    try:
+        executar_retreinamento()
+    except Exception as e:
+        print(f"⚠️ Erro ao treinar modelo: {e}")
+
+    mensagem = (
+    f"📈 Execução concluída.\n"
+    f"📉 Real: ${preco_real:.2f}\n"
+    f"🔮 Previsões:\n" +
+    "\n".join([f"  • {k}: ${v:.2f}" if isinstance(v, float) else f"  • {k}: {v}" for k, v in previsoes_modelos.items()]) +
+    f"\n📊 Média usada: ${previsao:.2f}\n"
+    f"💡 Operação sugerida: {tipo_operacao}"
+    )
+
+
+    print("📨 Enviando mensagem para o Telegram...")  # ADICIONE
+    enviar_mensagem(mensagem)
+
+def simular_operacao(preco_real: float, previsao: float) -> str:
+    """
+    Compara o preço previsto com o preço real para simular uma operação.
+
+    Estratégia:
+    - Se previsão > preço real + 1% => COMPRA
+    - Se previsão < preço real - 1% => VENDA
+    - Caso contrário => HOLD (não faz nada)
+    """
+    margem = 0.01  # 1%
+
+    if previsao > preco_real * (1 + margem):
+        return "COMPRA"
+    elif previsao < preco_real * (1 - margem):
+        return "VENDA"
+    else:
+        return "HOLD"
+
+def registrar_operacao(tipo: str, preco_real: float, previsao: float):
+    """
+    Registra a operação simulada no banco de dados SQLite.
+    """
+    resultado = ((previsao - preco_real) / preco_real) * 100  # % de variação
+    conn = sqlite3.connect("/data/app.db")
+    cursor = conn.cursor()
+
+    # Cria a tabela se ainda não existir
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS operacoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo TEXT,
+            preco REAL,
+            previsao REAL,
+            resultado REAL,
+            created_at TEXT
+        )
+    """)
+
+    # Insere a operação
+    cursor.execute("""
+        INSERT INTO operacoes (tipo, preco, previsao, resultado, created_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, (tipo, preco_real, previsao, resultado, datetime.utcnow().isoformat()))
+
+    conn.commit()
+    conn.close()
+
+def executar_callback():
+    realizar_analise()
+
+if __name__ == "__main__":
+    ativo_monitorado = "bitcoin"  # ou "ethereum", etc.
+
+    # ⏱ Agendador APScheduler
+    scheduler = BlockingScheduler()
+    scheduler.add_job(realizar_analise, "interval", minutes=2)  # ou outro tempo
+
+    # 🔁 Thread para escutar o Telegram
+    thread = threading.Thread(target=escutar_comandos_telegram,
+        args=(ativo_monitorado, scheduler, executar_callback))
+    
+    thread.daemon = True
+    thread.start()
+
+    print("✅ Agendador iniciado. Esperando próxima execução...")
+    scheduler.start()
+
+----------------------------------------
+Arquivo: ./worker/cronjob
+----------------------------------------
+*/10 * * * * root python /app/main.py >> /app/cron.log 2>&1
+0 2 * * * root python /app/main.py >> /var/log/worker.log 2>&1
+
+
+
+----------------------------------------
+Arquivo: ./worker/requirements_worker.txt
+----------------------------------------
+pandas
+requests
+apscheduler
+python-dotenv
+aiohttp
+scikit-learn
+joblib
+
+
+----------------------------------------
+Arquivo: ./config/config.yaml
+----------------------------------------
+app_name: ProjetoFuturo
+
+----------------------------------------
+Arquivo: ./scripts/coleta/coleta_cripto.py
+----------------------------------------
+# scripts/coleta/coleta_cripto.py
+import requests
+import pandas as pd
+from datetime import datetime
+import os
+import argparse
+
+def coletar_dados(ativo='bitcoin', vs_currency='usd', dias=30, intervalo='daily', output_path='data/input'):
+    url = f'https://api.coingecko.com/api/v3/coins/{ativo}/market_chart'
+    params = {
+        'vs_currency': vs_currency,
+        'days': dias,
+        'interval': intervalo
+    }
+
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+
+        prices = pd.DataFrame(data['prices'], columns=["timestamp", "price"])
+        prices['timestamp'] = pd.to_datetime(prices['timestamp'], unit='ms')
+
+        os.makedirs(output_path, exist_ok=True)
+        caminho_saida = os.path.join(output_path, f"{ativo}_{intervalo}_{dias}d.csv")
+        prices.to_csv(caminho_saida, index=False)
+        print(f"✅ Dados salvos em: {caminho_saida}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Erro ao coletar dados de {ativo}: {e}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Coleta de dados de criptomoedas via CoinGecko")
+    parser.add_argument('--ativo', type=str, default='bitcoin', help='Nome do ativo (ex: bitcoin, ethereum)')
+    parser.add_argument('--dias', type=int, default=30, help='Quantos dias de histórico')
+    parser.add_argument('--intervalo', type=str, default='daily', choices=['minutely', 'hourly', 'daily'], help='Intervalo de dados')
+    parser.add_argument('--saida', type=str, default='data/input', help='Diretório de saída')
+
+    args = parser.parse_args()
+
+    coletar_dados(
+        ativo=args.ativo,
+        dias=args.dias,
+        intervalo=args.intervalo,
+        output_path=args.saida
+    )
+
+
+----------------------------------------
+Arquivo: ./scripts/bin/iniciar.sh
+----------------------------------------
+#!/bin/bash
+cd /home/aplicacao/projetos/projeto_futuroV1
+docker compose up --build -d
+
+
+----------------------------------------
+Arquivo: ./scripts/bin/start_all.sh
+----------------------------------------
+#!/bin/bash
+echo 'Start all containers...'
+
+----------------------------------------
+Arquivo: ./README.md
+----------------------------------------
+# Projeto_FuturoV1
+
+O **Projeto_FuturoV1** é uma aplicação modular baseada em contêineres Docker, composta por três serviços principais:
+
+- **API (FastAPI)**: expõe uma interface HTTP para inferência de dados.
+- **Worker**: agenda tarefas recorrentes para execução e grava dados em um banco local.
+- **NN (Neural Network)**: executa inferência com base em um modelo predefinido.
+
+## Arquitetura
+
+Projeto_FuturoV1/
+├── api/ → API REST com FastAPI
+├── worker/ → Serviço de agendamento e persistência de previsões
+├── nn/ → Serviço de rede neural
+├── .data/ → Volume persistente compartilhado (banco SQLite)
+├── docker-compose.yml → Orquestrador de containers
+├── .gitignore → Ignora arquivos que não devem ser versionados
+└── README.md → Este arquivo
+
+
+---
+
+## Serviços
+
+### 🔹 API (FastAPI)
+- **Local**: `api/`
+- **Imagem**: `projeto_futurov1-api`
+- **Porta exposta**: `8000`
+- **Endpoints principais**:
+  - `GET /healthcheck` → Verifica se a API está ativa
+  - `POST /predictions` → Recebe requisições e consulta a NN
+
+### 🔹 Worker (Agendador)
+- **Local**: `worker/`
+- **Imagem**: `projeto_futurov1-worker`
+- **Função**: Roda a cada intervalo (via cron ou APScheduler) e grava previsões em `/data/app.db`
+
+### 🔹 NN (Rede Neural)
+- **Local**: `nn/`
+- **Imagem**: `projeto_futurov1-nn`
+- **Função**: Recebe chamadas da API e retorna previsões simuladas ou reais.
+
+---
+
+## Como executar
+
+### ✅ Pré-requisitos
+
+- Docker
+- Docker Compose
+- Git
+
+### 🔧 Configuração
+
+Clone o repositório:
+
+```bash
+git clone git@github.com:SEU_USUARIO/projetoFuturoV1.git
+cd projetoFuturoV1
+
+Construa e suba os serviços:
+docker compose up --build -d
+
+Verifique se a API está no ar:
+curl http://localhost:8000/healthcheck
+
+Manutenção
+📄 Ver logs dos serviços
+
+docker compose logs api
+docker compose logs worker
+docker compose logs nn
+
+🚫 Parar e remover containers
+
+docker compose down
+
+🔄 Reconstruir todos os serviços
+docker compose up --build -d
+
+Volume de Dados
+
+Os serviços compartilham um volume local .data/ onde o banco SQLite app.db é armazenado. Este volume é montado em /data dentro dos containers.
+Git & Versionamento
+
+Antes de subir alterações:
+
+git add .
+git commit -m "Mensagem clara do que foi alterado"
+git push origin main
+
+Certifique-se de que o .gitignore ignora .data/, __pycache__/, arquivos .pyc, etc.
+
+Endpoints principais
+
+### 🔹 API (FastAPI)
+- **Local**: `api/`
+- **Imagem**: `projeto_futurov1-api`
+- **Porta exposta**: `8000`
+
+#### Endpoints principais:
+
+| Método | Rota               | Descrição                                      |
+|--------|--------------------|-----------------------------------------------|
+| GET    | `/healthcheck`     | Verifica se a API está no ar                  |
+| POST   | `/predictions`     | Recebe parâmetros, aciona o serviço NN e retorna a previsão |
+
+
+Segurança
+
+    O SQLite está isolado via volume Docker.
+
+    Nenhum dado sensível é armazenado ou versionado no Git.
+
+    Para produção, considere usar PostgreSQL e autenticação JWT na API.
+
+Contribuição
+
+Sinta-se livre para abrir issues, sugerir melhorias ou criar Pull Requests!
+Licença
+
+Este projeto está licenciado sob a MIT License.
+
+
+----------------------------------------
+Arquivo: ./shared/__init__.py
+----------------------------------------
+# Shared module init
+
+----------------------------------------
+Arquivo: ./shared/telegram_bot.py
+----------------------------------------
+import os
+import time
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+
+if not BOT_TOKEN or not CHAT_ID:
+    raise ValueError("BOT_TOKEN ou CHAT_ID não definidos no arquivo .env")
+
+URL_BASE = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+# Enviar mensagem simples
+def enviar_mensagem(mensagem: str):
+    try:
+        url = f"{URL_BASE}/sendMessage"
+        payload = {
+            "chat_id": CHAT_ID,
+            "text": mensagem
+        }
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"❌ Erro ao enviar mensagem: {e}")
+
+# Escutar comandos via long polling
+def escutar_comandos_telegram(ativo_monitorado, scheduler, executar_callback):
+    print("🔁 Escutando comandos do Telegram...")
+    offset = None
+
+    while True:
+        try:
+            params = {"timeout": 10, "offset": offset}
+            resp = requests.get(f"{URL_BASE}/getUpdates", params=params, timeout=15)
+            resp.raise_for_status()
+            updates = resp.json()
+
+            for update in updates.get("result", []):
+                offset = update["update_id"] + 1
+                mensagem = update.get("message", {})
+                chat_id = str(mensagem.get("chat", {}).get("id", ""))
+                texto = mensagem.get("text", "").strip()
+
+                # Ignorar mensagens de outros usuários
+                if chat_id != CHAT_ID:
+                    continue
+
+                if texto.lower() == "/status":
+                    enviar_mensagem(f"🤖 Bot ativo. Monitorando {ativo_monitorado['nome']}.")
+                elif texto.startswith("/alterar"):
+                    partes = texto.split()
+                    if len(partes) == 2:
+                        ativo_monitorado["nome"] = partes[1]
+                        enviar_mensagem(f"🔄 Ativo alterado para: {ativo_monitorado['nome']}")
+                    else:
+                        enviar_mensagem("❌ Formato inválido. Use: /alterar bitcoin")
+                elif texto.lower() == "/executar":
+                    enviar_mensagem("⏱ Executando análise manual agora...")
+                    executar_callback()  # Chamada direta para função de execução
+                else:
+                    enviar_mensagem("🤖 Comando não reconhecido. Use /status ou /alterar <ativo>.")
+
+        except Exception as e:
+            print(f"❌ Erro no polling do Telegram: {e}")
+            time.sleep(5)  # Espera e tenta de novo
+
+
+----------------------------------------
+Arquivo: ./shared/telegram_bot_old.py
+----------------------------------------
+##shared/telegram_bot.py
+
+import os
+import time
+import requests
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+ultimo_update_id = None
+
+def enviar_mensagem(mensagem: str):
+    try:
+        url = f"{BASE_URL}/sendMessage"
+        response = requests.post(url, json={"chat_id": CHAT_ID, "text": mensagem}, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"❌ Falha ao enviar mensagem para Telegram: {e}")
+
+def escutar_comandos_telegram(ativo_monitorado: dict, scheduler):
+    global ultimo_update_id
+    print("🤖 Iniciando escuta de comandos via Telegram...")
+    while True:
+        try:
+            params = {"timeout": 30}
+            if ultimo_update_id:
+                params["offset"] = ultimo_update_id + 1
+
+            response = requests.get(f"{BASE_URL}/getUpdates", params=params, timeout=60)
+            response.raise_for_status()
+            updates = response.json().get("result", [])
+
+            for update in updates:
+                ultimo_update_id = update["update_id"]
+                message = update.get("message", {})
+                texto = message.get("text", "").strip().lower()
+
+                if not texto:
+                    continue
+
+                print(f"📨 Comando recebido: {texto}")
+                if texto == "/parar":
+                    if scheduler.running:
+                        scheduler.pause()
+                        enviar_mensagem("⏸️ Execução pausada.")
+                elif texto == "/retomar":
+                    if not scheduler.running:
+                        scheduler.resume()
+                        enviar_mensagem("▶️ Execução retomada.")
+                elif texto.startswith("/ativo"):
+                    partes = texto.split()
+                    if len(partes) == 2:
+                        ativo_monitorado["nome"] = partes[1]
+                        enviar_mensagem(f"✅ Ativo alterado para: {partes[1]}")
+                    else:
+                        enviar_mensagem("⚠️ Uso correto: /ativo <nome_do_ativo>")
+                elif texto == "/status":
+                    status = "⏸️ Pausado" if not scheduler.running else "▶️ Executando"
+                    enviar_mensagem(f"ℹ️ Ativo: {ativo_monitorado['nome']}\n⏱️ Status: {status}")
+                else:
+                    enviar_mensagem("❓ Comando não reconhecido. Use /status, /parar, /retomar ou /ativo <nome>.")
+
+        except Exception as e:
+            print(f"❌ Erro ao escutar comandos: {e}")
+            time.sleep(5)
+
+
+----------------------------------------
+Arquivo: ./shared/config.py
+----------------------------------------
+## shared/config.py
+
+# Parâmetros da coleta
+ATIVO = "bitcoin"
+INTERVALO = "5m"               # Pode ser '1m', '5m', '15m', '1h', '1d', etc.
+QUANTIDADE_CANDLES = 300       # Quantidade de candles para coletar (ex: 300 * 5min = ~25h)
+
+# Caminhos de arquivos
+CAMINHO_DADOS = f"/data/input/{ATIVO}_{INTERVALO}.csv"
+DIRETORIO_MODELO = "/data/modelo"
+
+# Modelo atual usado (pode ser trocado facilmente)
+NOME_MODELO = "LinearRegression"
+CAMINHO_MODELO = f"/data/modelo/modelo_{NOME_MODELO}_ativo.pkl"
+
+
+----------------------------------------
+Arquivo: ./shared/database.py
+----------------------------------------
+# shared/database.py
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+import os
+
+DB_USER = os.getenv("POSTGRES_USER", "trader")
+DB_PASS = os.getenv("POSTGRES_PASSWORD", "trader123")
+DB_NAME = os.getenv("POSTGRES_DB", "projetofuturo")
+DB_HOST = os.getenv("DB_HOST", "postgres")  # usando DB_HOST
+DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+#engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+#def get_db():
+#    db = SessionLocal()
+#    try:
+#        yield db
+#    finally:
+#        db.close()
+
+
+----------------------------------------
+Arquivo: ./shared/models.py
+----------------------------------------
+# shared/models.py
+
+from sqlalchemy import Column, Integer, Float, String, DateTime
+from datetime import datetime
+from shared.database import Base
+
+class PredictionResult(Base):
+    __tablename__ = "predictions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    model_name = Column(String, nullable=False)
+    predicted_value = Column(Float, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+
+----------------------------------------
+Arquivo: ./data/input/.gitkeep
+----------------------------------------
+[BINÁRIO OU NÃO-TEXTO - conteúdo não incluído]
+
+
+----------------------------------------
+Arquivo: ./data/input/bitcoin_daily_30d.csv
+----------------------------------------
+open_time,open,high,low,close,volume
+2025-05-31,103985.47,104900.0,103068.55,104591.88,11289.35922
+2025-06-01,104591.88,105866.91,103752.49,105642.93,9709.70006
+2025-06-02,105642.93,105935.63,103659.88,105857.99,13453.98813
+2025-06-03,105858.0,106794.67,104872.5,105376.89,13259.52634
+2025-06-04,105376.9,106000.0,104179.0,104696.86,14034.89482
+2025-06-05,104696.86,105909.71,100372.26,101508.68,22321.50154
+2025-06-06,101508.69,105333.0,101095.8,104288.44,15839.07385
+2025-06-07,104288.43,105900.0,103871.09,105552.15,8344.93206
+2025-06-08,105552.15,106488.14,104964.14,105734.0,8048.06305
+2025-06-09,105734.01,110530.17,105318.37,110263.02,19975.37451
+2025-06-10,110263.02,110400.0,108331.03,110274.39,17071.82839
+2025-06-11,110274.39,110392.01,108064.0,108645.12,13115.91638
+2025-06-12,108645.13,108813.55,105671.72,105671.73,17778.67218
+2025-06-13,105671.74,106179.53,102664.31,106066.59,26180.81734
+2025-06-14,106066.59,106252.0,104300.0,105414.64,8798.93969
+2025-06-15,105414.63,106128.57,104494.53,105594.01,7164.20047
+2025-06-16,105594.02,108952.38,104980.37,106794.53,14922.6654
+2025-06-17,106794.53,107771.34,103371.02,104551.17,17866.33025
+2025-06-18,104551.17,105550.27,103500.0,104886.78,13968.64167
+2025-06-19,104886.79,105226.17,103929.27,104658.59,7678.60737
+2025-06-20,104658.59,106524.65,102345.0,103297.99,16419.06283
+2025-06-21,103297.98,103982.64,100837.9,102120.01,11154.21332
+2025-06-22,102120.02,103399.62,98200.0,100963.87,28746.41072
+2025-06-23,100963.87,106074.2,99613.33,105333.93,27666.50609
+2025-06-24,105333.94,106290.0,104622.02,106083.0,14651.69335
+2025-06-25,106083.0,108135.3,105808.03,107340.58,16701.15551
+2025-06-26,107340.59,108272.45,106562.5,106947.06,10573.27279
+2025-06-27,106947.06,107735.34,106356.76,107047.59,12232.44042
+2025-06-28,107047.58,107577.75,106811.51,107296.79,3282.17352
+2025-06-29,107296.79,107500.0,107172.52,107210.77,529.82153
+
+
+----------------------------------------
+Arquivo: ./data/input/bitcoin_5m.csv
+----------------------------------------
+open_time,open,high,low,close,volume
+2025-06-28 16:10:00,107471.92,107471.93,107380.74,107431.48,28.04255
+2025-06-28 16:15:00,107431.48,107432.1,107380.0,107380.01,30.40336
+2025-06-28 16:20:00,107380.01,107380.01,107317.0,107317.0,17.99803
+2025-06-28 16:25:00,107317.01,107317.01,107253.22,107315.45,18.80258
+2025-06-28 16:30:00,107315.45,107450.27,107315.45,107408.4,27.31878
+2025-06-28 16:35:00,107408.4,107414.78,107362.15,107362.15,11.57859
+2025-06-28 16:40:00,107362.16,107362.16,107275.0,107309.61,9.61459
+2025-06-28 16:45:00,107309.61,107309.62,107272.0,107275.0,9.93706
+2025-06-28 16:50:00,107275.0,107287.06,107275.0,107276.32,9.93528
+2025-06-28 16:55:00,107276.32,107295.85,107263.81,107295.84,6.25129
+2025-06-28 17:00:00,107295.85,107301.0,107295.85,107301.0,3.64381
+2025-06-28 17:05:00,107301.0,107339.19,107295.13,107339.18,6.52925
+2025-06-28 17:10:00,107339.18,107370.19,107339.18,107367.12,7.92192
+2025-06-28 17:15:00,107367.13,107367.13,107348.5,107348.51,4.85222
+2025-06-28 17:20:00,107348.5,107348.51,107301.0,107334.01,5.28668
+2025-06-28 17:25:00,107334.01,107334.02,107324.01,107324.01,3.0846
+2025-06-28 17:30:00,107324.02,107364.87,107314.05,107364.87,6.74817
+2025-06-28 17:35:00,107364.86,107382.22,107357.54,107382.21,12.71451
+2025-06-28 17:40:00,107382.21,107426.08,107382.21,107413.25,11.99102
+2025-06-28 17:45:00,107413.24,107500.0,107394.12,107500.0,18.47879
+2025-06-28 17:50:00,107500.0,107542.5,107489.05,107489.06,23.88277
+2025-06-28 17:55:00,107489.06,107489.06,107465.12,107465.12,11.16174
+2025-06-28 18:00:00,107465.13,107465.13,107400.0,107400.01,11.21446
+2025-06-28 18:05:00,107400.0,107416.18,107400.0,107403.69,8.94654
+2025-06-28 18:10:00,107403.69,107416.92,107388.5,107416.91,7.52275
+2025-06-28 18:15:00,107416.91,107425.02,107384.54,107400.38,15.66014
+2025-06-28 18:20:00,107400.38,107400.38,107390.5,107396.23,6.23863
+2025-06-28 18:25:00,107396.24,107431.5,107343.24,107348.5,9.72179
+2025-06-28 18:30:00,107348.51,107367.22,107300.99,107300.99,8.05019
+2025-06-28 18:35:00,107300.99,107306.67,107300.99,107306.66,8.08485
+2025-06-28 18:40:00,107306.66,107306.67,107292.0,107292.0,2.20232
+2025-06-28 18:45:00,107292.0,107292.01,107263.03,107263.03,4.42977
+2025-06-28 18:50:00,107263.03,107263.04,107260.64,107260.64,7.19461
+2025-06-28 18:55:00,107260.64,107318.0,107260.64,107318.0,8.55758
+2025-06-28 19:00:00,107318.0,107318.0,107311.73,107311.74,4.07093
+2025-06-28 19:05:00,107311.74,107311.74,107300.03,107300.19,2.53712
+2025-06-28 19:10:00,107300.19,107311.74,107300.19,107311.73,3.77774
+2025-06-28 19:15:00,107311.73,107339.38,107311.73,107339.37,4.71493
+2025-06-28 19:20:00,107339.38,107339.38,107300.0,107300.0,7.28556
+2025-06-28 19:25:00,107300.0,107300.01,107300.0,107300.01,3.09088
+2025-06-28 19:30:00,107300.01,107300.01,107291.01,107291.01,6.41717
+2025-06-28 19:35:00,107291.02,107291.02,107250.0,107260.59,7.79241
+2025-06-28 19:40:00,107260.59,107270.63,107255.0,107255.01,10.31503
+2025-06-28 19:45:00,107255.0,107255.01,107250.06,107250.06,6.59745
+2025-06-28 19:50:00,107250.06,107250.07,107249.96,107249.96,8.81052
+2025-06-28 19:55:00,107249.97,107249.97,107225.74,107225.74,4.29518
+2025-06-28 20:00:00,107225.74,107225.75,107218.92,107218.93,11.83572
+2025-06-28 20:05:00,107218.92,107218.93,107218.92,107218.93,1.58273
+2025-06-28 20:10:00,107218.92,107218.93,107168.34,107174.77,15.81827
+2025-06-28 20:15:00,107174.77,107204.8,107154.62,107186.28,11.01169
+2025-06-28 20:20:00,107186.28,107219.57,107186.28,107219.57,4.67765
+2025-06-28 20:25:00,107219.56,107235.4,107219.56,107235.4,3.20961
+2025-06-28 20:30:00,107235.4,107235.4,107216.8,107216.8,4.91089
+2025-06-28 20:35:00,107216.8,107216.81,107203.7,107203.7,4.53523
+2025-06-28 20:40:00,107203.7,107216.81,107187.49,107187.5,4.72491
+2025-06-28 20:45:00,107187.49,107194.81,107187.49,107194.8,5.04559
+2025-06-28 20:50:00,107194.8,107203.71,107194.8,107203.71,4.01449
+2025-06-28 20:55:00,107203.7,107203.71,107169.52,107169.52,9.04001
+2025-06-28 21:00:00,107169.52,107177.88,107169.52,107177.87,4.44694
+2025-06-28 21:05:00,107177.88,107220.0,107177.87,107219.99,5.24511
+2025-06-28 21:10:00,107219.99,107220.0,107194.0,107194.0,10.24374
+2025-06-28 21:15:00,107194.0,107214.0,107194.0,107214.0,5.71466
+2025-06-28 21:20:00,107214.0,107214.0,107213.99,107214.0,4.0378
+2025-06-28 21:25:00,107214.0,107255.62,107214.0,107255.61,4.26876
+2025-06-28 21:30:00,107255.62,107300.0,107255.61,107283.9,15.09951
+2025-06-28 21:35:00,107283.9,107286.7,107272.73,107272.73,5.42192
+2025-06-28 21:40:00,107272.73,107272.74,107262.35,107271.25,9.89709
+2025-06-28 21:45:00,107271.25,107271.25,107235.83,107235.83,5.41074
+2025-06-28 21:50:00,107235.83,107312.94,107235.83,107312.94,5.92964
+2025-06-28 21:55:00,107312.94,107347.65,107312.93,107331.38,6.45844
+2025-06-28 22:00:00,107331.37,107373.53,107328.04,107365.5,12.09871
+2025-06-28 22:05:00,107365.49,107365.5,107317.39,107340.0,9.83119
+2025-06-28 22:10:00,107339.99,107340.0,107257.09,107258.36,27.82649
+2025-06-28 22:15:00,107258.37,107300.0,107258.36,107280.86,12.14261
+2025-06-28 22:20:00,107280.86,107305.82,107280.86,107305.82,5.82373
+2025-06-28 22:25:00,107305.81,107306.9,107296.16,107300.46,11.80132
+2025-06-28 22:30:00,107300.46,107317.4,107290.0,107317.4,6.94439
+2025-06-28 22:35:00,107317.39,107331.1,107317.39,107331.1,10.28587
+2025-06-28 22:40:00,107331.09,107369.68,107331.09,107369.67,8.08422
+2025-06-28 22:45:00,107369.67,107369.68,107351.54,107354.04,12.45547
+2025-06-28 22:50:00,107354.04,107365.51,107351.79,107351.8,10.3402
+2025-06-28 22:55:00,107351.79,107378.37,107347.5,107370.61,13.96294
+2025-06-28 23:00:00,107370.61,107370.62,107342.47,107347.0,9.59946
+2025-06-28 23:05:00,107347.0,107347.0,107337.47,107337.47,3.83223
+2025-06-28 23:10:00,107337.48,107339.39,107334.17,107334.17,6.64629
+2025-06-28 23:15:00,107334.18,107334.18,107328.21,107328.22,3.40975
+2025-06-28 23:20:00,107328.22,107328.22,107316.04,107316.04,7.64137
+2025-06-28 23:25:00,107316.04,107317.82,107313.0,107313.01,8.00869
+2025-06-28 23:30:00,107313.0,107313.01,107300.71,107300.71,6.52756
+2025-06-28 23:35:00,107300.72,107300.72,107288.15,107288.15,4.94751
+2025-06-28 23:40:00,107288.15,107288.16,107288.15,107288.16,3.5251
+2025-06-28 23:45:00,107288.15,107293.0,107288.15,107293.0,4.79824
+2025-06-28 23:50:00,107292.99,107304.32,107282.72,107304.31,6.49983
+2025-06-28 23:55:00,107304.31,107304.32,107296.78,107296.79,9.62865
+2025-06-29 00:00:00,107296.79,107296.79,107285.45,107285.46,4.55229
+2025-06-29 00:05:00,107285.45,107285.46,107254.16,107264.67,7.7573
+2025-06-29 00:10:00,107264.68,107264.68,107262.22,107262.52,8.86663
+2025-06-29 00:15:00,107262.52,107262.53,107262.52,107262.53,2.27985
+2025-06-29 00:20:00,107262.52,107350.53,107262.52,107343.57,23.19753
+2025-06-29 00:25:00,107343.56,107475.75,107343.56,107431.48,32.86454
+2025-06-29 00:30:00,107431.47,107460.0,107416.99,107437.0,14.29441
+2025-06-29 00:35:00,107437.0,107437.01,107394.0,107394.0,10.17381
+2025-06-29 00:40:00,107394.01,107413.7,107367.06,107412.29,8.72502
+2025-06-29 00:45:00,107412.29,107498.0,107401.55,107497.99,48.09174
+2025-06-29 00:50:00,107497.99,107500.0,107480.43,107483.86,38.31581
+2025-06-29 00:55:00,107483.86,107495.85,107474.9,107475.92,17.11783
+2025-06-29 01:00:00,107475.91,107475.92,107440.53,107440.54,7.1197
+2025-06-29 01:05:00,107440.54,107440.54,107415.0,107415.0,3.71747
+2025-06-29 01:10:00,107415.0,107415.01,107404.26,107404.26,5.72341
+2025-06-29 01:15:00,107404.27,107404.27,107402.17,107402.18,11.35566
+2025-06-29 01:20:00,107402.18,107424.46,107402.17,107416.81,10.91126
+2025-06-29 01:25:00,107416.8,107423.89,107407.16,107423.89,14.33346
+2025-06-29 01:30:00,107423.89,107423.9,107423.88,107423.89,11.41294
+2025-06-29 01:35:00,107423.89,107423.9,107415.5,107415.51,6.91198
+2025-06-29 01:40:00,107415.51,107415.51,107360.0,107360.01,8.10336
+2025-06-29 01:45:00,107360.0,107360.01,107330.0,107330.51,6.44774
+2025-06-29 01:50:00,107330.5,107330.51,107330.5,107330.51,2.27279
+2025-06-29 01:55:00,107330.5,107330.51,107310.53,107311.0,12.94756
+2025-06-29 02:00:00,107311.0,107311.01,107180.0,107180.0,25.67682
+2025-06-29 02:05:00,107180.01,107230.77,107172.52,107230.77,11.81837
+2025-06-29 02:10:00,107230.76,107230.77,107205.65,107230.74,7.1148
+2025-06-29 02:15:00,107230.73,107230.74,107216.96,107216.96,9.54776
+2025-06-29 02:20:00,107216.96,107216.97,107192.5,107210.3,22.82764
+2025-06-29 02:25:00,107210.3,107244.0,107199.57,107231.18,11.49405
+2025-06-29 02:30:00,107231.17,107231.18,107210.26,107210.26,5.2032
+2025-06-29 02:35:00,107210.26,107242.68,107210.26,107242.67,7.30368
+2025-06-29 02:40:00,107242.68,107355.06,107242.67,107315.46,26.3938
+2025-06-29 02:45:00,107315.45,107315.45,107301.19,107301.19,4.33611
+2025-06-29 02:50:00,107301.19,107301.2,107301.19,107301.19,2.5725
+2025-06-29 02:55:00,107301.19,107307.48,107301.19,107307.48,9.05235
+2025-06-29 03:00:00,107307.47,107307.48,107268.38,107268.38,5.57381
+2025-06-29 03:05:00,107268.39,107271.63,107268.38,107271.62,5.0053
+2025-06-29 03:10:00,107271.62,107271.63,107271.62,107271.63,3.03615
+2025-06-29 03:15:00,107271.62,107275.01,107267.48,107267.49,8.10255
+2025-06-29 03:20:00,107267.49,107293.22,107267.48,107293.21,5.04072
+2025-06-29 03:25:00,107293.21,107293.22,107284.52,107284.52,4.33404
+2025-06-29 03:30:00,107284.53,107284.53,107281.65,107281.65,3.99906
+2025-06-29 03:35:00,107281.66,107281.66,107208.9,107208.9,6.98742
+2025-06-29 03:40:00,107208.9,107208.91,107190.0,107190.01,13.29295
+2025-06-29 03:45:00,107190.0,107200.0,107189.86,107199.99,8.36666
+2025-06-29 03:50:00,107200.0,107210.78,107200.0,107210.77,6.09511
+2025-06-29 03:55:00,107210.77,107210.78,107210.77,107210.78,3.36559
+2025-06-29 04:00:00,107210.78,107220.0,107210.77,107220.0,7.63305
+2025-06-29 04:05:00,107220.0,107229.31,107219.99,107229.3,5.64649
+2025-06-29 04:10:00,107229.31,107243.35,107229.3,107243.35,5.90925
+2025-06-29 04:15:00,107243.35,107243.35,107243.34,107243.35,4.36498
+2025-06-29 04:20:00,107243.35,107243.35,107241.76,107241.76,4.24715
+2025-06-29 04:25:00,107241.76,107241.77,107237.52,107237.52,3.77094
+2025-06-29 04:30:00,107237.53,107237.53,107237.52,107237.53,1.88473
+2025-06-29 04:35:00,107237.53,107237.53,107237.52,107237.52,1.19107
+2025-06-29 04:40:00,107237.52,107237.53,107237.52,107237.53,0.90958
+2025-06-29 04:45:00,107237.52,107237.53,107237.52,107237.53,5.8891
+2025-06-29 04:50:00,107237.52,107256.07,107237.52,107256.06,3.42939
+2025-06-29 04:55:00,107256.06,107272.77,107256.06,107264.15,10.78738
+2025-06-29 05:00:00,107264.16,107264.16,107240.0,107240.0,5.48209
+2025-06-29 05:05:00,107240.01,107240.01,107238.33,107238.33,5.97976
+2025-06-29 05:10:00,107238.33,107242.69,107238.33,107242.69,4.04225
+2025-06-29 05:15:00,107242.69,107242.69,107242.68,107242.69,6.37352
+2025-06-29 05:20:00,107242.68,107242.69,107230.14,107230.15,4.7929
+2025-06-29 05:25:00,107230.14,107230.15,107220.0,107220.0,3.55898
+2025-06-29 05:30:00,107220.01,107220.01,107205.82,107205.83,3.72569
+2025-06-29 05:35:00,107205.83,107217.97,107205.82,107217.96,3.89769
+2025-06-29 05:40:00,107217.97,107241.44,107217.97,107241.43,6.44023
+2025-06-29 05:45:00,107241.43,107293.21,107241.43,107293.2,12.46632
+2025-06-29 05:50:00,107293.21,107310.0,107293.2,107309.99,3.13535
+2025-06-29 05:55:00,107309.99,107310.0,107309.99,107309.99,6.08349
+2025-06-29 06:00:00,107310.0,107310.0,107309.99,107310.0,2.3912
+2025-06-29 06:05:00,107310.0,107316.09,107309.99,107316.09,4.38433
+2025-06-29 06:10:00,107316.09,107316.9,107316.08,107316.9,3.40324
+2025-06-29 06:15:00,107316.9,107350.01,107316.89,107336.51,22.01924
+2025-06-29 06:20:00,107336.51,107336.51,107336.5,107336.5,4.80461
+2025-06-29 06:25:00,107336.5,107336.51,107334.79,107334.8,4.49803
+2025-06-29 06:30:00,107334.8,107349.66,107334.79,107348.55,10.16363
+2025-06-29 06:35:00,107348.54,107348.55,107348.54,107348.54,5.25747
+2025-06-29 06:40:00,107348.54,107348.55,107339.52,107339.52,6.4283
+2025-06-29 06:45:00,107339.53,107339.53,107339.52,107339.52,3.66808
+2025-06-29 06:50:00,107339.53,107339.53,107339.52,107339.53,2.9732
+2025-06-29 06:55:00,107339.53,107385.92,107339.52,107376.95,34.84097
+2025-06-29 07:00:00,107376.96,107384.83,107347.64,107347.64,18.53539
+2025-06-29 07:05:00,107347.64,107387.98,107347.64,107369.17,14.06877
+2025-06-29 07:10:00,107369.17,107369.17,107361.4,107361.4,7.96517
+2025-06-29 07:15:00,107361.41,107361.41,107344.0,107344.01,5.91877
+2025-06-29 07:20:00,107344.0,107344.01,107343.99,107343.99,8.98671
+2025-06-29 07:25:00,107344.0,107344.0,107343.99,107344.0,4.91697
+2025-06-29 07:30:00,107344.0,107344.0,107343.99,107343.99,3.94389
+2025-06-29 07:35:00,107344.0,107344.0,107330.0,107330.0,7.40712
+2025-06-29 07:40:00,107330.01,107330.01,107330.0,107330.01,6.08422
+2025-06-29 07:45:00,107330.01,107330.01,107330.0,107330.01,6.28085
+2025-06-29 07:50:00,107330.01,107340.39,107330.0,107340.39,16.74169
+2025-06-29 07:55:00,107340.38,107402.18,107340.38,107402.18,13.2534
+2025-06-29 08:00:00,107402.17,107491.0,107402.17,107491.0,25.37379
+2025-06-29 08:05:00,107490.99,107492.0,107435.0,107435.0,13.6408
+2025-06-29 08:10:00,107435.01,107460.0,107435.0,107449.33,14.46918
+2025-06-29 08:15:00,107449.32,107449.33,107426.65,107426.66,7.03946
+2025-06-29 08:20:00,107426.66,107449.33,107426.65,107449.32,6.35334
+2025-06-29 08:25:00,107449.32,107449.33,107449.32,107449.33,5.13136
+2025-06-29 08:30:00,107449.33,107679.81,107449.32,107627.72,96.22357
+2025-06-29 08:35:00,107627.72,107652.39,107627.71,107629.3,38.9025
+2025-06-29 08:40:00,107629.3,107719.58,107629.3,107685.5,50.52785
+2025-06-29 08:45:00,107685.5,107710.73,107674.45,107674.46,17.83701
+2025-06-29 08:50:00,107674.46,107719.58,107674.45,107692.07,26.9386
+2025-06-29 08:55:00,107692.06,107693.85,107670.12,107693.85,15.05023
+2025-06-29 09:00:00,107693.85,107800.0,107646.83,107680.71,82.48183
+2025-06-29 09:05:00,107680.7,107680.71,107627.49,107680.63,21.43648
+2025-06-29 09:10:00,107680.62,107733.49,107680.62,107733.48,13.15229
+2025-06-29 09:15:00,107733.48,107805.0,107733.48,107804.95,28.10416
+2025-06-29 09:20:00,107804.95,107804.99,107790.73,107804.03,24.36966
+2025-06-29 09:25:00,107804.03,107804.04,107750.25,107796.0,23.65623
+2025-06-29 09:30:00,107796.01,107923.0,107796.0,107908.99,73.66688
+2025-06-29 09:35:00,107908.99,107950.0,107887.79,107910.73,56.59391
+2025-06-29 09:40:00,107910.73,107936.88,107907.44,107925.64,11.0206
+2025-06-29 09:45:00,107925.63,107966.93,107917.0,107966.92,20.30227
+2025-06-29 09:50:00,107966.93,107971.8,107937.25,107971.79,15.9001
+2025-06-29 09:55:00,107971.8,107972.74,107842.21,107891.64,46.35038
+2025-06-29 10:00:00,107891.64,108000.0,107891.63,108000.0,84.84706
+2025-06-29 10:05:00,108000.0,108159.18,107999.99,108158.63,162.25592
+2025-06-29 10:10:00,108159.18,108176.27,108138.0,108153.96,51.07636
+2025-06-29 10:15:00,108153.96,108185.61,108081.42,108185.6,74.94633
+2025-06-29 10:20:00,108185.6,108282.96,108170.51,108282.96,79.73216
+2025-06-29 10:25:00,108282.95,108297.89,108138.54,108138.55,51.1868
+2025-06-29 10:30:00,108138.54,108172.15,108080.43,108092.37,27.97521
+2025-06-29 10:35:00,108092.38,108092.38,108013.36,108016.19,46.22946
+2025-06-29 10:40:00,108016.19,108016.2,108000.0,108000.01,50.03186
+2025-06-29 10:45:00,108000.0,108121.46,107849.61,108121.46,79.47453
+2025-06-29 10:50:00,108121.45,108234.5,108116.37,108170.93,49.20729
+2025-06-29 10:55:00,108170.94,108173.47,108116.37,108153.26,32.98447
+2025-06-29 11:00:00,108153.25,108191.19,108153.25,108170.92,22.25083
+2025-06-29 11:05:00,108170.93,108170.93,108123.18,108152.62,35.74623
+2025-06-29 11:10:00,108152.62,108152.63,108111.82,108111.83,23.48988
+2025-06-29 11:15:00,108111.83,108146.0,108096.56,108146.0,32.41258
+2025-06-29 11:20:00,108145.99,108179.62,108134.1,108134.1,36.20915
+2025-06-29 11:25:00,108134.11,108157.02,108120.0,108151.52,18.47255
+2025-06-29 11:30:00,108151.51,108160.0,108151.51,108160.0,17.84108
+2025-06-29 11:35:00,108159.99,108227.07,108159.99,108194.0,39.40394
+2025-06-29 11:40:00,108194.0,108196.0,108180.0,108196.0,13.07924
+2025-06-29 11:45:00,108196.0,108278.24,108195.99,108246.66,35.05021
+2025-06-29 11:50:00,108246.67,108484.0,108219.16,108425.0,116.95018
+2025-06-29 11:55:00,108425.01,108480.9,108406.96,108477.11,73.55187
+2025-06-29 12:00:00,108477.12,108528.5,108377.17,108410.0,135.98755
+2025-06-29 12:05:00,108409.99,108410.0,108250.0,108250.0,37.88923
+2025-06-29 12:10:00,108250.0,108250.01,108150.0,108176.43,40.50849
+2025-06-29 12:15:00,108176.42,108257.08,108176.42,108254.31,21.19075
+2025-06-29 12:20:00,108254.31,108305.81,108254.3,108288.13,21.51785
+2025-06-29 12:25:00,108288.14,108288.24,108205.45,108207.79,12.84385
+2025-06-29 12:30:00,108207.79,108227.1,108202.87,108207.6,17.25971
+2025-06-29 12:35:00,108207.61,108228.28,108176.5,108177.0,15.65924
+2025-06-29 12:40:00,108177.0,108177.01,108033.0,108034.5,29.79783
+2025-06-29 12:45:00,108034.5,108138.45,108034.5,108125.77,20.35809
+2025-06-29 12:50:00,108125.77,108146.7,108116.45,108146.69,8.94497
+2025-06-29 12:55:00,108146.69,108189.88,108146.69,108189.88,12.46814
+2025-06-29 13:00:00,108189.88,108228.28,108189.87,108228.27,34.65243
+2025-06-29 13:05:00,108228.28,108228.28,108140.73,108146.64,13.86974
+2025-06-29 13:10:00,108146.65,108165.22,108127.03,108145.0,35.61711
+2025-06-29 13:15:00,108144.99,108145.0,108109.18,108133.35,11.62665
+2025-06-29 13:20:00,108133.34,108156.69,108114.64,108114.64,25.94041
+2025-06-29 13:25:00,108114.64,108114.64,108087.0,108111.05,11.9688
+2025-06-29 13:30:00,108111.04,108135.93,108030.41,108030.42,19.06842
+2025-06-29 13:35:00,108030.41,108087.0,108012.82,108086.99,34.73441
+2025-06-29 13:40:00,108087.0,108181.2,108074.0,108152.57,24.33067
+2025-06-29 13:45:00,108152.57,108183.81,108036.21,108040.56,11.23517
+2025-06-29 13:50:00,108040.57,108097.45,108040.56,108053.98,16.74716
+2025-06-29 13:55:00,108053.99,108060.42,108051.52,108051.52,14.80608
+2025-06-29 14:00:00,108051.53,108069.19,108051.52,108063.38,11.93297
+2025-06-29 14:05:00,108063.39,108150.0,108063.39,108149.99,10.23546
+2025-06-29 14:10:00,108150.0,108207.6,108143.0,108207.59,17.18939
+2025-06-29 14:15:00,108207.59,108215.12,108161.0,108214.22,13.59612
+2025-06-29 14:20:00,108214.21,108214.21,108106.01,108106.01,12.54821
+2025-06-29 14:25:00,108106.02,108106.02,108074.09,108086.44,10.50708
+2025-06-29 14:30:00,108086.45,108086.45,107967.0,107995.65,22.40574
+2025-06-29 14:35:00,107995.66,107995.66,107777.77,107868.47,119.08024
+2025-06-29 14:40:00,107868.47,107924.07,107837.01,107860.01,22.62833
+2025-06-29 14:45:00,107860.01,107906.46,107796.0,107836.68,25.86703
+2025-06-29 14:50:00,107836.68,107916.47,107828.76,107916.09,35.92058
+2025-06-29 14:55:00,107916.1,107975.0,107916.0,107948.08,44.26364
+2025-06-29 15:00:00,107948.07,107954.18,107828.0,107897.76,43.92577
+2025-06-29 15:05:00,107897.76,108034.13,107897.75,108020.0,38.77358
+2025-06-29 15:10:00,108020.01,108023.91,108001.23,108001.24,17.62956
+2025-06-29 15:15:00,108001.23,108001.24,107875.71,107899.99,55.80491
+2025-06-29 15:20:00,107899.99,107953.26,107890.0,107953.25,22.10919
+2025-06-29 15:25:00,107953.26,107955.05,107922.77,107922.78,18.43035
+2025-06-29 15:30:00,107922.77,107955.0,107910.86,107910.86,19.72266
+2025-06-29 15:35:00,107910.86,107940.28,107886.6,107934.87,13.14876
+2025-06-29 15:40:00,107934.87,107959.91,107903.55,107903.56,8.85998
+2025-06-29 15:45:00,107903.56,107903.56,107698.73,107769.0,40.69327
+2025-06-29 15:50:00,107769.01,107769.01,107650.0,107723.82,34.28625
+2025-06-29 15:55:00,107723.82,107783.07,107702.28,107750.72,31.87712
+2025-06-29 16:00:00,107750.72,107792.05,107750.72,107760.36,27.54241
+2025-06-29 16:05:00,107760.35,107783.7,107633.85,107667.46,30.30386
+2025-06-29 16:10:00,107667.46,107675.0,107640.0,107671.88,48.44852
+2025-06-29 16:15:00,107671.89,107756.68,107671.88,107674.0,57.19044
+2025-06-29 16:20:00,107674.0,107674.01,107571.73,107571.73,51.87221
+2025-06-29 16:25:00,107571.73,107571.74,107468.83,107524.28,77.00598
+2025-06-29 16:30:00,107524.27,107620.0,107470.67,107558.99,52.51718
+2025-06-29 16:35:00,107558.99,107579.96,107477.82,107556.91,45.37932
+2025-06-29 16:40:00,107556.91,107556.91,107479.29,107490.57,25.92138
+2025-06-29 16:45:00,107490.58,107497.35,107320.0,107432.22,61.10523
+2025-06-29 16:50:00,107432.23,107458.74,107404.46,107458.73,26.30239
+2025-06-29 16:55:00,107458.74,107605.56,107453.64,107552.03,41.51457
+2025-06-29 17:00:00,107552.03,107592.17,107552.02,107562.56,34.67456
+2025-06-29 17:05:00,107562.56,107562.56,107538.22,107538.22,2.15872
+
+
+----------------------------------------
+Arquivo: ./data/output/.gitkeep
+----------------------------------------
+[BINÁRIO OU NÃO-TEXTO - conteúdo não incluído]
+
+
+----------------------------------------
+Arquivo: ./data/trades.db
+----------------------------------------
+[BINÁRIO OU NÃO-TEXTO - conteúdo não incluído]
+
+
+----------------------------------------
+Arquivo: ./data/app.db
+----------------------------------------
+[BINÁRIO OU NÃO-TEXTO - conteúdo não incluído]
+
+
+----------------------------------------
+Arquivo: ./.gitignore
+----------------------------------------
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches
+*.cache
+*.log
+
+# Virtual environments
+.env/
+.venv/
+
+# SQLite DB (opcional)
+*.sqlite3
+*.db
+
+# Pytest
+.pytest_cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# VS Code / IDEs
+.vscode/
+.idea/
+
+# Docker
+*.pid
+*.sock
+docker-compose.override.yml
+
+# Data volumes
+.data/
+
+# Envs ou secrets
+.env
+.env.*
+
+# System
+.DS_Store
+Thumbs.db
+
+# Git
+*.swp
+
+
+----------------------------------------
+Arquivo: ./init/db_init.py
+----------------------------------------
+# init/db_init.py
+
+from shared.database import Base, engine
+from shared.models import PredictionResult
+
+print("🔄 Criando tabelas no PostgreSQL...")
+Base.metadata.create_all(bind=engine)
+print("✅ Tabelas criadas com sucesso.")
+
+
+
+
+----------------------------------------
+Arquivo: ./init/Dockerfile
+----------------------------------------
+# init/Dockerfile
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+COPY ./api/app ./api/app
+COPY ./init/db_init.py ./db_init.py
+COPY ./api/requirements_api.txt ./requirements.txt
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+CMD ["python", "db_init.py"]
+
+
+----------------------------------------
+Arquivo: ./test_telegram.py
+----------------------------------------
+# test_telegram.py
+import os
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+
+message = "🚀 Teste de envio via Telegram bot."
+
+url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+response = requests.post(url, data={"chat_id": CHAT_ID, "text": message})
+
+print("Status:", response.status_code)
+print(response.text)
+
+
+
+----------------------------------------
+Arquivo: ./debug_updates.py
+----------------------------------------
+import requests
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
+
+r = requests.get(url)
+print(r.status_code)
+print(r.json())
+
+
+----------------------------------------
+Arquivo: ./docker-compose.yml
+----------------------------------------
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - appnet
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./shared:/app/shared
+    depends_on:
+      - nn
+      - worker
+      - db_init
+      - postgres   # 🔄 API espera o Postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - appnet
+
+  nn:
+    build: ./nn
+    container_name: nn
+    volumes:
+      - ./shared:/app/shared
+      - ./nn/models:/app/models
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - appnet
+
+  worker:
+    build: ./worker
+    container_name: worker
+    volumes:
+      - ./nn:/app/nn
+      - ./scripts:/app/scripts
+      - ./shared:/app/shared
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - appnet
+
+  db_init:
+    build:
+      context: ./init
+    container_name: init
+    depends_on:
+      - nn
+      - worker
+      - postgres   # 🔄 migrations rodam depois do banco
+    volumes:
+      - ./data:/app/data
+    restart: "no"
+    env_file:
+      - .env
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge
+
+
+----------------------------------------
+Arquivo: ./requirements.txt
+----------------------------------------
+
+##/opt/Projetos/Projeto_FuturoV1/requirements.txt
+
+anyio==4.9.0
+certifi==2025.4.26
+charset-normalizer==3.4.2
+coverage==7.8.1
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.10
+iniconfig==2.1.0
+packaging==25.0
+pluggy==1.6.0
+pytest==8.3.5
+pytest-cov==6.1.1
+python-dotenv==1.1.0
+requests==2.32.3
+requests-mock==1.12.1
+sniffio==1.3.1
+urllib3==2.4.0
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pandas==2.2.2
+
+
+----------------------------------------
+Arquivo: ./resume_files.sh
+----------------------------------------
+#/bin/bash
+
+timestamp=$(date )
+
+
+----------------------------------------
+Arquivo: ./.env
+----------------------------------------
+#projetofuturo/.env
+#No futuro mudar para o vault
+
+BOT_TOKEN=7199722766:AAHaVdaV4VbkxYzBBV8EFMd0a-MuqYj9xdE
+CHAT_ID=717731723
+
+POSTGRES_USER=trader
+POSTGRES_PASSWORD=trader123
+POSTGRES_DB=projetofuturo
+DB_HOST=postgres
+POSTGRES_PORT=5432
+
+
+----------------------------------------
+Arquivo: ./estrutura_projeto_20251115_234713.txt
+----------------------------------------
+[BINÁRIO OU NÃO-TEXTO - conteúdo não incluído]
+
+

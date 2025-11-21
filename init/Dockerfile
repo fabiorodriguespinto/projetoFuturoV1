@@ -1,12 +1,17 @@
-FROM python:3.10-slim
+# init/Dockerfile
 
-WORKDIR /app
+FROM python:3.11
 
-COPY db_init.py .
+WORKDIR /init
 
-# Copie o requirements.txt se o script tiver dependências
-# COPY ../api/requirements.txt .
-# RUN pip install --no-cache-dir -r requirements.txt
+COPY init /init
+COPY shared /init/shared
+COPY neural_network /init/neural_network
 
-# Se o db_init.py for autossuficiente (ex: usa apenas sqlite3), isso basta:
+COPY init/requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+ENV PYTHONPATH="/init"
+
 CMD ["python", "db_init.py"]

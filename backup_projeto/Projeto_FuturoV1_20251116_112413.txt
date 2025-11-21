@@ -1,0 +1,1752 @@
+==============================
+📁 Estrutura de diretórios :: /opt/Projetos/Projeto_FuturoV1
+Gerado: 2025-11-16 11:24:13-03:00
+==============================
+
+.
+├── api
+│   ├── app
+│   │   ├── main.py
+│   │   ├── models
+│   │   │   ├── __init__.py
+│   │   │   └── models.py
+│   │   ├── routers
+│   │   │   ├── .gitignore
+│   │   │   ├── healthcheck.py
+│   │   │   ├── __init__.py
+│   │   │   └── predict.py
+│   │   └── services
+│   │       ├── database.py
+│   │       └── __init__.py
+│   ├── Dockerfile
+│   └── requirements.txt
+├── config
+│   └── config.yaml
+├── data
+│   ├── app.db
+│   ├── input
+│   ├── modelo
+│   ├── output
+│   └── trades.db
+├── debug_updates.py
+├── docker-compose.yml
+├── .env
+├── .gitignore
+├── grafana
+├── init
+│   ├── db_init.py
+│   ├── Dockerfile
+│   └── requirements.txt
+├── neural_network
+│   ├── Dockerfile
+│   ├── inference
+│   │   └── predict.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   └── models.py
+│   ├── requirements_nueral_network.txt
+│   └── training
+│       ├── __init__.py
+│       ├── train_bkp2.py
+│       ├── train_bkp3.py
+│       ├── train_linear.py
+│       ├── train.py
+│       ├── train_rf.py
+│       ├── train_xgb.py
+│       ├── treinar_linear.py
+│       ├── treinar_modelo.py
+│       └── utils.py
+├── README.md
+├── requirements.txt
+├── resume_files.sh
+├── scripts
+│   ├── bin
+│   │   ├── iniciar.sh
+│   │   └── start_all.sh
+│   └── coleta
+│       └── coleta_cripto.py
+├── shared
+│   ├── config.py
+│   ├── database.py
+│   ├── __init__.py
+│   ├── market_data.py
+│   ├── models.py
+│   ├── telegram_bot_old.py
+│   └── telegram_bot.py
+├── test_telegram.py
+└── worker
+    ├── cronjob
+    ├── Dockerfile
+    ├── main.py
+    ├── market_collector.py
+    ├── requirements.txt
+    └── tasks
+        ├── heimdall
+        ├── __init__.py
+        └── retrain_model.py
+
+24 directories, 57 files
+
+==============================
+📄 Conteúdo dos arquivos
+==============================
+
+----------------------------------------
+Arquivo: ./api/app/routers/__init__.py
+----------------------------------------
+# Router init
+
+----------------------------------------
+Arquivo: ./api/app/routers/predict.py
+----------------------------------------
+##api/app/routers/predict.py
+
+# api/app/routers/predict.py
+from fastapi import APIRouter
+from shared.database import carregar_candles
+from shared import config
+import joblib
+import numpy as np
+import pandas as pd
+import os
+
+router = APIRouter(prefix="/predict", tags=["Predição"])
+
+MODEL_DIR = "/neural_network/models/"
+
+
+@router.post("/")
+def prever():
+    # 1) Carregar candles recentes
+    df = carregar_candles(limit=config.NUM_CANDLES_USADOS)
+
+    if df is None or len(df) < config.NUM_CANDLES_USADOS:
+        return {"erro": "Dados insuficientes no banco."}
+
+    # 2) Gerar features (exemplo básico)
+    X = df.tail(config.NUM_CANDLES_USADOS)["close"].pct_change().fillna(0).values
+    X = np.array([X])
+
+    # 3) Carregar modelos
+    modelos = {}
+    previsoes = []
+
+    for nome_arquivo in os.listdir(MODEL_DIR):
+        if nome_arquivo.endswith(".pkl"):
+            modelo = joblib.load(os.path.join(MODEL_DIR, nome_arquivo))
+            y = modelo.predict(X)[0]
+            modelos[nome_arquivo] = float(y)
+            previsoes.append(y)
+
+    if not previsoes:
+        return {"erro": "Nenhum modelo encontrado."}
+
+    previsao_final = float(np.mean(previsoes))
+
+    return {
+        "prediction": previsao_final,
+        "models": modelos
+    }
+
+
+----------------------------------------
+Arquivo: ./api/app/routers/healthcheck.py
+----------------------------------------
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+----------------------------------------
+Arquivo: ./api/app/routers/.gitignore
+----------------------------------------
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.db
+
+# VSCode
+.vscode/
+
+# Environments
+.env
+.venv/
+env/
+venv/
+
+# Docker
+*.log
+data/
+.data/
+
+# Byte-compiled / optimized / DLL files
+*.so
+*.o
+*.pyc
+*.pyo
+
+# System files
+.DS_Store
+Thumbs.db
+
+----------------------------------------
+Arquivo: ./api/app/models/__init__.py
+----------------------------------------
+# Models init
+
+----------------------------------------
+Arquivo: ./api/app/models/models.py
+----------------------------------------
+# Modelos agora estão em shared/models.py
+
+#from sqlalchemy import Column, Integer, Float, DateTime
+#from app.services.database import Base
+#from datetime import datetime
+
+#class PredictionResult(Base):
+#    __tablename__ = "predictions"
+
+#    id = Column(Integer, primary_key=True, index=True)
+#    #price = Column(Float)
+#    #day_of_year = Column(Integer)
+#    #created_at = Column(DateTime, default=datetime.utcnow)
+#    symbol = Column(String)
+#    prediction = Column(Float)
+
+----------------------------------------
+Arquivo: ./api/app/services/__init__.py
+----------------------------------------
+# Services init
+
+----------------------------------------
+Arquivo: ./api/app/services/database.py
+----------------------------------------
+# api/app/services/database.py
+from shared.database import SessionLocal, engine, Base
+
+----------------------------------------
+Arquivo: ./api/app/main.py
+----------------------------------------
+##api/main.py
+
+# api/app/main.py
+from fastapi import FastAPI
+from routers.predict import router as predict_router
+
+app = FastAPI(
+    title="Projeto FuturoV1 API",
+    version="1.0.0"
+)
+
+app.include_router(predict_router)
+
+
+@app.get("/health")
+def healthcheck():
+    return {"status": "ok"}
+
+
+----------------------------------------
+Arquivo: ./api/Dockerfile
+----------------------------------------
+##api/Dockerfile
+# Dockerfile da API
+
+
+FROM python:3.11
+
+WORKDIR /app
+
+# Instalar dependências primeiro (melhor cache)
+COPY api/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Copiar código
+COPY api/ /app
+COPY shared/ /shared
+COPY neural_network/ /neural_network
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+
+----------------------------------------
+Arquivo: ./api/requirements.txt
+----------------------------------------
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+psycopg2-binary
+pandas
+numpy
+joblib
+python-dotenv
+requests
+
+----------------------------------------
+Arquivo: ./worker/Dockerfile
+----------------------------------------
+FROM python:3.11
+
+WORKDIR /worker
+
+# Instalar dependências primeiro
+COPY worker/requirements.txt /worker/requirements.txt
+RUN pip install --no-cache-dir -r /worker/requirements.txt
+
+# Copiar código
+COPY worker/ /worker
+COPY shared/ /shared
+COPY neural_network/ /neural_network
+
+CMD ["python", "main.py"]
+
+
+
+
+----------------------------------------
+Arquivo: ./worker/tasks/__init__.py
+----------------------------------------
+# Tasks init
+
+----------------------------------------
+Arquivo: ./worker/tasks/retrain_model.py
+----------------------------------------
+##worker/tasks/retrain_model,py
+
+from nn.training.train import treinar_modelo
+
+def executar_retreinamento():
+    print("Iniciando re-treinamento do modelo...")
+    treinar_modelo()
+    print("Re-treinamento finalizado.")
+
+
+----------------------------------------
+Arquivo: ./worker/main.py
+----------------------------------------
+##worker/main.py
+
+from datetime import datetime
+from apscheduler.schedulers.blocking import BlockingScheduler
+from shared.market_data import coletar_candles_binance
+from shared.database import SessionLocal
+from shared.telegram_bot import enviar_mensagem, escutar_comandos_telegram
+from shared.models import PredictionResult
+from shared import config
+import requests
+import threading
+
+
+# =======================================================
+# PREVISÃO VIA API FASTAPI
+# =======================================================
+def executar_inferencia():
+    try:
+        response = requests.post("http://api:8000/predict", timeout=10)
+        result = response.json()
+        return result.get("prediction"), result.get("models")
+    except Exception as e:
+        enviar_mensagem(f"❌ Erro na inferência: {e}")
+        return None, {}
+
+
+# =======================================================
+# GRAVAR PREVISÃO NO POSTGRES
+# =======================================================
+def registrar_previsao(valor_previsto: float):
+    db = SessionLocal()
+    registro = PredictionResult(
+        timestamp=datetime.utcnow(),
+        predicted_price=valor_previsto,
+        strategy_signal="",
+        model_used="ensemble"
+    )
+    db.add(registro)
+    db.commit()
+    db.close()
+
+
+# =======================================================
+# SIMULAÇÃO DE OPERAÇÃO (ESTRATÉGIA)
+# =======================================================
+def simular_operacao(preco_real: float, previsao: float) -> str:
+    margem = 0.01  # 1%
+
+    if previsao > preco_real * (1 + margem):
+        return "COMPRA"
+    elif previsao < preco_real * (1 - margem):
+        return "VENDA"
+    return "HOLD"
+
+
+# =======================================================
+# REGISTRAR OPERAÇÃO NO POSTGRES
+# =======================================================
+def registrar_operacao(tipo: str, preco_real: float, previsao: float):
+    db = SessionLocal()
+    resultado = ((previsao - preco_real) / preco_real) * 100
+
+    registro = PredictionResult(
+        timestamp=datetime.utcnow(),
+        predicted_price=previsao,
+        strategy_signal=tipo,
+        model_used=f"variação: {resultado:.2f}%"
+    )
+    db.add(registro)
+    db.commit()
+    db.close()
+
+
+# =======================================================
+# EXECUTAR TODA A ANÁLISE (FLUXO PRINCIPAL)
+# =======================================================
+def realizar_analise():
+    enviar_mensagem("⏱ Iniciando análise...")
+
+    # 1) Coletar dados da Binance
+    try:
+        coletar_candles_binance()
+    except Exception as e:
+        enviar_mensagem(f"❌ Erro na coleta: {e}")
+        return
+
+    # 2) Inferência via API
+    previsao, detalhes = executar_inferencia()
+    if previsao is None:
+        return
+
+    # 3) Preço real = último candle recebido (pegar do banco)
+    from shared.market_data import carregar_candles
+    df = carregar_candles(limit=1)
+    preco_real = float(df["close"].iloc[-1])
+
+    # 4) Estratégia
+    tipo_operacao = simular_operacao(preco_real, previsao)
+
+    # 5) Registrar resultados
+    registrar_previsao(previsao)
+    registrar_operacao(tipo_operacao, preco_real, previsao)
+
+    # 6) Envio Telegram
+    msg = (
+        f"📈 Execução concluída.\n"
+        f"📉 Real: {preco_real:.2f}\n"
+        f"🔮 Previsão: {previsao:.2f}\n\n"
+        f"🧠 Detalhes por modelo:\n" +
+        "\n".join([f"• {k}: {v:.2f}" for k, v in detalhes.items()]) +
+        f"\n\n💡 Operação sugerida: {tipo_operacao}"
+    )
+    enviar_mensagem(msg)
+
+
+# =======================================================
+# CALLBACK PARA COMANDOS DO TELEGRAM
+# =======================================================
+def executar_callback():
+    realizar_analise()
+
+
+# =======================================================
+# INICIAR SCHEDULER E LISTENER
+# =======================================================
+if __name__ == "__main__":
+    ativo_monitorado = "bitcoin"
+
+    scheduler = BlockingScheduler()
+    scheduler.add_job(realizar_analise, "interval", minutes=2)
+
+    thread = threading.Thread(
+        target=escutar_comandos_telegram,
+        args=(ativo_monitorado, scheduler, executar_callback)
+    )
+    thread.daemon = True
+    thread.start()
+
+    enviar_mensagem("🤖 Worker iniciado e aguardando rotinas...")
+
+    scheduler.start()
+
+
+----------------------------------------
+Arquivo: ./worker/cronjob
+----------------------------------------
+*/10 * * * * root python /app/main.py >> /app/cron.log 2>&1
+0 2 * * * root python /app/main.py >> /var/log/worker.log 2>&1
+
+
+
+----------------------------------------
+Arquivo: ./worker/market_collector.py
+----------------------------------------
+#worker/market_colletctor.py
+
+import requests
+import pandas as pd
+from shared.database import engine
+
+def coletar_candles(symbol="BTCUSDT", interval="1m", limit=500):
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+    data = requests.get(url).json()
+
+    rows = []
+    for k in data:
+        rows.append({
+            "open_time": pd.to_datetime(k[0], unit="ms"),
+            "open": float(k[1]),
+            "high": float(k[2]),
+            "low": float(k[3]),
+            "close": float(k[4]),
+            "volume": float(k[5]),
+        })
+
+    df = pd.DataFrame(rows)
+    df.to_sql("candles", engine, if_exists="append", index=False)
+
+
+----------------------------------------
+Arquivo: ./worker/requirements.txt
+----------------------------------------
+apscheduler
+requests
+sqlalchemy
+psycopg2-binary
+pandas
+numpy
+python-telegram-bot==13.15
+python-dotenv
+joblib
+
+
+----------------------------------------
+Arquivo: ./config/config.yaml
+----------------------------------------
+app_name: ProjetoFuturo
+
+----------------------------------------
+Arquivo: ./scripts/coleta/coleta_cripto.py
+----------------------------------------
+# scripts/coleta/coleta_cripto.py
+import requests
+import pandas as pd
+from datetime import datetime
+import os
+import argparse
+
+def coletar_dados(ativo='bitcoin', vs_currency='usd', dias=30, intervalo='daily', output_path='data/input'):
+    url = f'https://api.coingecko.com/api/v3/coins/{ativo}/market_chart'
+    params = {
+        'vs_currency': vs_currency,
+        'days': dias,
+        'interval': intervalo
+    }
+
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+
+        prices = pd.DataFrame(data['prices'], columns=["timestamp", "price"])
+        prices['timestamp'] = pd.to_datetime(prices['timestamp'], unit='ms')
+
+        os.makedirs(output_path, exist_ok=True)
+        caminho_saida = os.path.join(output_path, f"{ativo}_{intervalo}_{dias}d.csv")
+        prices.to_csv(caminho_saida, index=False)
+        print(f"✅ Dados salvos em: {caminho_saida}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Erro ao coletar dados de {ativo}: {e}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Coleta de dados de criptomoedas via CoinGecko")
+    parser.add_argument('--ativo', type=str, default='bitcoin', help='Nome do ativo (ex: bitcoin, ethereum)')
+    parser.add_argument('--dias', type=int, default=30, help='Quantos dias de histórico')
+    parser.add_argument('--intervalo', type=str, default='daily', choices=['minutely', 'hourly', 'daily'], help='Intervalo de dados')
+    parser.add_argument('--saida', type=str, default='data/input', help='Diretório de saída')
+
+    args = parser.parse_args()
+
+    coletar_dados(
+        ativo=args.ativo,
+        dias=args.dias,
+        intervalo=args.intervalo,
+        output_path=args.saida
+    )
+
+
+----------------------------------------
+Arquivo: ./scripts/bin/iniciar.sh
+----------------------------------------
+#!/bin/bash
+cd /home/aplicacao/projetos/projeto_futuroV1
+docker compose up --build -d
+
+
+----------------------------------------
+Arquivo: ./scripts/bin/start_all.sh
+----------------------------------------
+#!/bin/bash
+echo 'Start all containers...'
+
+----------------------------------------
+Arquivo: ./README.md
+----------------------------------------
+# Projeto_FuturoV1
+
+O **Projeto_FuturoV1** é uma aplicação modular baseada em contêineres Docker, composta por três serviços principais:
+
+- **API (FastAPI)**: expõe uma interface HTTP para inferência de dados.
+- **Worker**: agenda tarefas recorrentes para execução e grava dados em um banco local.
+- **NN (Neural Network)**: executa inferência com base em um modelo predefinido.
+
+## Arquitetura
+
+Projeto_FuturoV1/
+├── api/ → API REST com FastAPI
+├── worker/ → Serviço de agendamento e persistência de previsões
+├── nn/ → Serviço de rede neural
+├── .data/ → Volume persistente compartilhado (banco SQLite)
+├── docker-compose.yml → Orquestrador de containers
+├── .gitignore → Ignora arquivos que não devem ser versionados
+└── README.md → Este arquivo
+
+
+---
+
+## Serviços
+
+### 🔹 API (FastAPI)
+- **Local**: `api/`
+- **Imagem**: `projeto_futurov1-api`
+- **Porta exposta**: `8000`
+- **Endpoints principais**:
+  - `GET /healthcheck` → Verifica se a API está ativa
+  - `POST /predictions` → Recebe requisições e consulta a NN
+
+### 🔹 Worker (Agendador)
+- **Local**: `worker/`
+- **Imagem**: `projeto_futurov1-worker`
+- **Função**: Roda a cada intervalo (via cron ou APScheduler) e grava previsões em `/data/app.db`
+
+### 🔹 NN (Rede Neural)
+- **Local**: `nn/`
+- **Imagem**: `projeto_futurov1-nn`
+- **Função**: Recebe chamadas da API e retorna previsões simuladas ou reais.
+
+---
+
+## Como executar
+
+### ✅ Pré-requisitos
+
+- Docker
+- Docker Compose
+- Git
+
+### 🔧 Configuração
+
+Clone o repositório:
+
+```bash
+git clone git@github.com:SEU_USUARIO/projetoFuturoV1.git
+cd projetoFuturoV1
+
+Construa e suba os serviços:
+docker compose up --build -d
+
+Verifique se a API está no ar:
+curl http://localhost:8000/healthcheck
+
+Manutenção
+📄 Ver logs dos serviços
+
+docker compose logs api
+docker compose logs worker
+docker compose logs nn
+
+🚫 Parar e remover containers
+
+docker compose down
+
+🔄 Reconstruir todos os serviços
+docker compose up --build -d
+
+Volume de Dados
+
+Os serviços compartilham um volume local .data/ onde o banco SQLite app.db é armazenado. Este volume é montado em /data dentro dos containers.
+Git & Versionamento
+
+Antes de subir alterações:
+
+git add .
+git commit -m "Mensagem clara do que foi alterado"
+git push origin main
+
+Certifique-se de que o .gitignore ignora .data/, __pycache__/, arquivos .pyc, etc.
+
+Endpoints principais
+
+### 🔹 API (FastAPI)
+- **Local**: `api/`
+- **Imagem**: `projeto_futurov1-api`
+- **Porta exposta**: `8000`
+
+#### Endpoints principais:
+
+| Método | Rota               | Descrição                                      |
+|--------|--------------------|-----------------------------------------------|
+| GET    | `/healthcheck`     | Verifica se a API está no ar                  |
+| POST   | `/predictions`     | Recebe parâmetros, aciona o serviço NN e retorna a previsão |
+
+
+Segurança
+
+    O SQLite está isolado via volume Docker.
+
+    Nenhum dado sensível é armazenado ou versionado no Git.
+
+    Para produção, considere usar PostgreSQL e autenticação JWT na API.
+
+Contribuição
+
+Sinta-se livre para abrir issues, sugerir melhorias ou criar Pull Requests!
+Licença
+
+Este projeto está licenciado sob a MIT License.
+
+
+----------------------------------------
+Arquivo: ./shared/__init__.py
+----------------------------------------
+# Shared module init
+
+----------------------------------------
+Arquivo: ./shared/telegram_bot.py
+----------------------------------------
+import os
+import time
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+
+if not BOT_TOKEN or not CHAT_ID:
+    raise ValueError("BOT_TOKEN ou CHAT_ID não definidos no arquivo .env")
+
+URL_BASE = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+# Enviar mensagem simples
+def enviar_mensagem(mensagem: str):
+    try:
+        url = f"{URL_BASE}/sendMessage"
+        payload = {
+            "chat_id": CHAT_ID,
+            "text": mensagem
+        }
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"❌ Erro ao enviar mensagem: {e}")
+
+# Escutar comandos via long polling
+def escutar_comandos_telegram(ativo_monitorado, scheduler, executar_callback):
+    print("🔁 Escutando comandos do Telegram...")
+    offset = None
+
+    while True:
+        try:
+            params = {"timeout": 10, "offset": offset}
+            resp = requests.get(f"{URL_BASE}/getUpdates", params=params, timeout=15)
+            resp.raise_for_status()
+            updates = resp.json()
+
+            for update in updates.get("result", []):
+                offset = update["update_id"] + 1
+                mensagem = update.get("message", {})
+                chat_id = str(mensagem.get("chat", {}).get("id", ""))
+                texto = mensagem.get("text", "").strip()
+
+                # Ignorar mensagens de outros usuários
+                if chat_id != CHAT_ID:
+                    continue
+
+                if texto.lower() == "/status":
+                    enviar_mensagem(f"🤖 Bot ativo. Monitorando {ativo_monitorado['nome']}.")
+                elif texto.startswith("/alterar"):
+                    partes = texto.split()
+                    if len(partes) == 2:
+                        ativo_monitorado["nome"] = partes[1]
+                        enviar_mensagem(f"🔄 Ativo alterado para: {ativo_monitorado['nome']}")
+                    else:
+                        enviar_mensagem("❌ Formato inválido. Use: /alterar bitcoin")
+                elif texto.lower() == "/executar":
+                    enviar_mensagem("⏱ Executando análise manual agora...")
+                    executar_callback()  # Chamada direta para função de execução
+                else:
+                    enviar_mensagem("🤖 Comando não reconhecido. Use /status ou /alterar <ativo>.")
+
+        except Exception as e:
+            print(f"❌ Erro no polling do Telegram: {e}")
+            time.sleep(5)  # Espera e tenta de novo
+
+
+----------------------------------------
+Arquivo: ./shared/telegram_bot_old.py
+----------------------------------------
+##shared/telegram_bot.py
+
+import os
+import time
+import requests
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+ultimo_update_id = None
+
+def enviar_mensagem(mensagem: str):
+    try:
+        url = f"{BASE_URL}/sendMessage"
+        response = requests.post(url, json={"chat_id": CHAT_ID, "text": mensagem}, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"❌ Falha ao enviar mensagem para Telegram: {e}")
+
+def escutar_comandos_telegram(ativo_monitorado: dict, scheduler):
+    global ultimo_update_id
+    print("🤖 Iniciando escuta de comandos via Telegram...")
+    while True:
+        try:
+            params = {"timeout": 30}
+            if ultimo_update_id:
+                params["offset"] = ultimo_update_id + 1
+
+            response = requests.get(f"{BASE_URL}/getUpdates", params=params, timeout=60)
+            response.raise_for_status()
+            updates = response.json().get("result", [])
+
+            for update in updates:
+                ultimo_update_id = update["update_id"]
+                message = update.get("message", {})
+                texto = message.get("text", "").strip().lower()
+
+                if not texto:
+                    continue
+
+                print(f"📨 Comando recebido: {texto}")
+                if texto == "/parar":
+                    if scheduler.running:
+                        scheduler.pause()
+                        enviar_mensagem("⏸️ Execução pausada.")
+                elif texto == "/retomar":
+                    if not scheduler.running:
+                        scheduler.resume()
+                        enviar_mensagem("▶️ Execução retomada.")
+                elif texto.startswith("/ativo"):
+                    partes = texto.split()
+                    if len(partes) == 2:
+                        ativo_monitorado["nome"] = partes[1]
+                        enviar_mensagem(f"✅ Ativo alterado para: {partes[1]}")
+                    else:
+                        enviar_mensagem("⚠️ Uso correto: /ativo <nome_do_ativo>")
+                elif texto == "/status":
+                    status = "⏸️ Pausado" if not scheduler.running else "▶️ Executando"
+                    enviar_mensagem(f"ℹ️ Ativo: {ativo_monitorado['nome']}\n⏱️ Status: {status}")
+                else:
+                    enviar_mensagem("❓ Comando não reconhecido. Use /status, /parar, /retomar ou /ativo <nome>.")
+
+        except Exception as e:
+            print(f"❌ Erro ao escutar comandos: {e}")
+            time.sleep(5)
+
+
+----------------------------------------
+Arquivo: ./shared/config.py
+----------------------------------------
+## shared/config.py
+
+# Parâmetros da coleta
+ATIVO = "bitcoin"
+INTERVALO = "5m"               # Pode ser '1m', '5m', '15m', '1h', '1d', etc.
+QUANTIDADE_CANDLES = 300       # Quantidade de candles para coletar (ex: 300 * 5min = ~25h)
+
+# Caminhos de arquivos
+CAMINHO_DADOS = f"/data/input/{ATIVO}_{INTERVALO}.csv"
+DIRETORIO_MODELO = "/data/modelo"
+
+# Modelo atual usado (pode ser trocado facilmente)
+NOME_MODELO = "LinearRegression"
+CAMINHO_MODELO = f"/data/modelo/modelo_{NOME_MODELO}_ativo.pkl"
+
+
+----------------------------------------
+Arquivo: ./shared/database.py
+----------------------------------------
+# shared/database.py
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+import os
+
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASS = os.getenv("DB_PASS", "postgres")
+DB_NAME = os.getenv("DB_NAME", "futuro")
+DB_HOST = os.getenv("DB_HOST", "db")
+DB_PORT = os.getenv("DB_PORT", "5432")
+
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+
+
+----------------------------------------
+Arquivo: ./shared/models.py
+----------------------------------------
+# shared/models.py
+
+# shared/models.py
+from sqlalchemy import Column, Integer, Float, String, DateTime
+from sqlalchemy.orm import declarative_base
+from datetime import datetime
+
+Base = declarative_base()
+
+
+class Candle(Base):
+    __tablename__ = "candles"
+
+    id = Column(Integer, primary_key=True)
+    open_time = Column(DateTime, index=True)
+    open = Column(Float)
+    high = Column(Float)
+    low = Column(Float)
+    close = Column(Float)
+    volume = Column(Float)
+
+
+class PredictionResult(Base):
+    __tablename__ = "prediction_results"
+
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    predicted_price = Column(Float)
+    strategy_signal = Column(String)
+    model_used = Column(String)
+
+
+
+----------------------------------------
+Arquivo: ./shared/market_data.py
+----------------------------------------
+#Projeto_FuturoV1/shared/market_data.py
+
+import requests
+import pandas as pd
+from sqlalchemy import text
+from shared.database import engine, SessionLocal
+from shared.models import Candle
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------
+# GRAVAR CANDLES NO POSTGRES
+# ---------------------------------------------
+def salvar_candles(df: pd.DataFrame):
+    try:
+        df.to_sql("candles", engine, if_exists="append", index=False)
+        logger.info(f"{len(df)} candles inseridos")
+    except Exception as e:
+        logger.error(f"Erro ao salvar candles: {e}")
+
+
+# ---------------------------------------------
+# BUSCAR CANDLES DO POSTGRES
+# ---------------------------------------------
+def carregar_candles(limit=500):
+    query = text(f"""
+        SELECT open_time, open, high, low, close, volume
+        FROM candles
+        ORDER BY open_time DESC
+        LIMIT {limit}
+    """)
+
+    df = pd.read_sql(query, engine)
+    df.sort_values("open_time", inplace=True)
+    return df
+
+
+# ---------------------------------------------
+# COLETAR CANDLES DA BINANCE
+# ---------------------------------------------
+def coletar_candles_binance(symbol="BTCUSDT", interval="1m", limit=500):
+    url = (
+        "https://api.binance.com/api/v3/klines"
+        f"?symbol={symbol}&interval={interval}&limit={limit}"
+    )
+    data = requests.get(url).json()
+
+    candles = []
+    for k in data:
+        candles.append(from sqlalchemy import Column, Integer, Float, String, DateTime
+from datetime import datetime
+from shared.database import Base
+
+class PredictionResult(Base):
+    __tablename__ = "predictions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    model_name = Column(String, nullable=False)
+    predicted_value = Column(Float, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+            {
+                "open_time": datetime.fromtimestamp(k[0] / 1000),
+                "open": float(k[1]),
+                "high": float(k[2]),
+                "low": float(k[3]),
+                "close": float(k[4]),
+                "volume": float(k[5]),
+            }
+        )
+
+    df = pd.DataFrame(candles)
+    salvar_candles(df)
+    return df
+
+
+----------------------------------------
+Arquivo: ./data/trades.db
+----------------------------------------
+[BINÁRIO OU NÃO-TEXTO - conteúdo não incluído]
+
+
+----------------------------------------
+Arquivo: ./data/app.db
+----------------------------------------
+[BINÁRIO OU NÃO-TEXTO - conteúdo não incluído]
+
+
+----------------------------------------
+Arquivo: ./.gitignore
+----------------------------------------
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches
+*.cache
+*.log
+
+# Virtual environments
+.env/
+.venv/
+
+# SQLite DB (opcional)
+*.sqlite3
+*.db
+
+# Pytest
+.pytest_cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# VS Code / IDEs
+.vscode/
+.idea/
+
+# Docker
+*.pid
+*.sock
+docker-compose.override.yml
+
+# Data volumes
+.data/
+
+# Envs ou secrets
+.env
+.env.*
+
+# System
+.DS_Store
+Thumbs.db
+
+# Git
+*.swp
+
+
+----------------------------------------
+Arquivo: ./init/db_init.py
+----------------------------------------
+# init/db_init.py
+
+# init/db_init.py
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from shared.models import Base, Candle, PredictionResult
+from shared import config
+
+def inicializar_banco():
+    engine = create_engine(config.DATABASE_URL)
+    Base.metadata.create_all(bind=engine)
+    print("✅ Banco de dados inicializado com sucesso.")
+
+if __name__ == "__main__":
+    inicializar_banco()
+
+
+
+
+----------------------------------------
+Arquivo: ./init/Dockerfile
+----------------------------------------
+# init/Dockerfile
+
+FROM python:3.11
+
+WORKDIR /init
+
+COPY init/requirements.txt /init/requirements.txt
+RUN pip install --no-cache-dir -r /init/requirements.txt
+
+COPY init/ /init
+COPY shared/ /shared
+
+CMD ["python", "/init/db_init.py"]
+
+
+
+----------------------------------------
+Arquivo: ./init/requirements.txt
+----------------------------------------
+
+sqlalchemy
+psycopg2-binary
+python-dotenv
+
+
+----------------------------------------
+Arquivo: ./test_telegram.py
+----------------------------------------
+# test_telegram.py
+import os
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+
+message = "🚀 Teste de envio via Telegram bot."
+
+url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+response = requests.post(url, data={"chat_id": CHAT_ID, "text": message})
+
+print("Status:", response.status_code)
+print(response.text)
+
+
+
+----------------------------------------
+Arquivo: ./debug_updates.py
+----------------------------------------
+import requests
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
+
+r = requests.get(url)
+print(r.status_code)
+print(r.json())
+
+
+----------------------------------------
+Arquivo: ./docker-compose.yml
+----------------------------------------
+#version: "3.9"
+
+services:
+  # =====================================================
+  # 🗄️ BANCO DE DADOS POSTGRESQL
+  # =====================================================
+  db:
+    image: postgres:15
+    container_name: futurov1_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    ports:
+      - "5432:5432"
+
+  # =====================================================
+  # 🔧 INICIALIZADOR DO BANCO (CRIA TABELAS)
+  # =====================================================
+  db_init:
+    container_name: futurov1_db_init
+    build:
+      context: .
+      dockerfile: init/Dockerfile
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    networks:
+      - backend
+    command: ["python", "/init/db_init.py"]
+
+  # =====================================================
+  # 🚀 API FASTAPI
+  # =====================================================
+  api:
+    container_name: futurov1_api
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      - db
+      - db_init
+    volumes:
+      - ./neural_network:/neural_network
+      - ./shared:/shared
+    networks:
+      - backend
+    ports:
+      - "8000:8000"
+
+  # =====================================================
+  # 🤖 WORKER
+  # =====================================================
+  worker:
+    container_name: futurov1_worker
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+    depends_on:
+      - api
+      - db
+      - db_init
+    volumes:
+      - ./shared:/shared
+      - ./neural_network:/neural_network
+    networks:
+      - backend
+
+  # =====================================================
+  # 📊 GRAFANA PARA DASHBOARDS
+  # =====================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: futurov1_grafana
+    restart: always
+    depends_on:
+      - db
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS}
+    networks:
+      - backend
+      - monitoring
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  # =====================================================
+  # 🖥 PGADMIN
+  # =====================================================
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: futurov1_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASS}
+    networks:
+      - backend
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+  # =====================================================
+  # 🧭 HEIMDALL (OPCIONAL, DASHBOARD INICIAL)
+  # =====================================================
+  heimdall:
+    image: linuxserver/heimdall
+    container_name: futurov1_heimdall
+    restart: always
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: America/Sao_Paulo
+    networks:
+      - monitoring
+    ports:
+      - "8090:80"
+    volumes:
+      - heimdall_data:/config
+
+# =====================================================
+# VOLUMES
+# =====================================================
+volumes:
+  postgres_data:
+  grafana_data:
+  pgadmin_data:
+  heimdall_data:
+
+# =====================================================
+# REDES
+# =====================================================
+networks:
+  backend:
+  monitoring:
+
+
+----------------------------------------
+Arquivo: ./requirements.txt
+----------------------------------------
+
+##/opt/Projetos/Projeto_FuturoV1/requirements.txt
+
+anyio==4.9.0
+certifi==2025.4.26
+charset-normalizer==3.4.2
+coverage==7.8.1
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.10
+iniconfig==2.1.0
+packaging==25.0
+pluggy==1.6.0
+pytest==8.3.5
+pytest-cov==6.1.1
+python-dotenv==1.1.0
+requests==2.32.3
+requests-mock==1.12.1
+sniffio==1.3.1
+urllib3==2.4.0
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pandas==2.2.2
+
+
+----------------------------------------
+Arquivo: ./resume_files.sh
+----------------------------------------
+#/bin/bash
+
+timestamp=$(date )
+
+
+----------------------------------------
+Arquivo: ./.env
+----------------------------------------
+#projetofuturo/.env
+#No futuro mudar para o vault
+
+BOT_TOKEN=7199722766:AAHaVdaV4VbkxYzBBV8EFMd0a-MuqYj9xdE
+CHAT_ID=717731723
+
+POSTGRES_USER=trader
+POSTGRES_PASSWORD=trader123
+POSTGRES_DB=projetofuturo
+DB_HOST=postgres
+POSTGRES_PORT=5432
+
+DB_USER=futuro
+DB_PASS=senha123
+DB_NAME=futurov1
+DATABASE_URL=postgresql+psycopg2://futuro:senha123@db:5432/futurov1
+
+TELEGRAM_TOKEN=seu_token
+TELEGRAM_CHAT_ID=123456789
+
+GRAFANA_PASS=admin123
+PGADMIN_EMAIL=admin@local.com
+PGADMIN_PASS=admin123
+
+----------------------------------------
+Arquivo: ./neural_network/training/train.py
+----------------------------------------
+##nn/training/train.py
+
+from .train_linear import treinar_modelo_linear
+from .train_rf import treinar_modelo_rf
+from .train_xgb import treinar_modelo_xgb
+
+def treinar_todos_modelos():
+    treinar_modelo_linear()
+    treinar_modelo_rf()
+    treinar_modelo_xgb()
+
+
+
+
+----------------------------------------
+Arquivo: ./neural_network/training/__init__.py
+----------------------------------------
+# Training init
+
+----------------------------------------
+Arquivo: ./neural_network/training/treinar_modelo.py
+----------------------------------------
+# nn/training/treinar_modelo.py
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import pickle
+
+df = pd.read_csv('dados/btc.csv')
+df['timestamp'] = pd.to_datetime(df['timestamp'])
+df['dia'] = df['timestamp'].dt.dayofyear
+X = df[['dia']]
+y = df['price']
+
+modelo = LinearRegression()
+modelo.fit(X, y)
+
+with open('nn/modelos/modelo_btc.pkl', 'wb') as f:
+    pickle.dump(modelo, f)
+
+print("Modelo treinado e salvo em nn/modelos/modelo_btc.pkl")
+
+# Enviar notificação ao finalizar
+from shared.telegram_bot import notificar_telegram
+notificar_telegram("Re-treinamento finalizado com sucesso!")
+
+----------------------------------------
+Arquivo: ./neural_network/training/train_bkp2.py
+----------------------------------------
+##neural_network/training/train.py
+
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import joblib
+import os
+
+def treinar_modelo():
+    print("📚 Iniciando treinamento do modelo...")
+
+    # Caminho para o arquivo CSV
+    csv_path = "/data/input/bitcoin_daily_30d.csv"
+    df = pd.read_csv(csv_path)
+
+    # Garante que os dados necessários estão presentes
+    features = ["open", "high", "low", "volume"]
+    target = "close"  # Previsão do preço de fechamento
+
+    for coluna in features + [target]:
+        if coluna not in df.columns:
+            raise ValueError(f"Coluna obrigatória ausente: {coluna}")
+
+    # Remove possíveis NaNs
+    df.dropna(subset=features + [target], inplace=True)
+
+    # Separa X e y
+    X = df[features]
+    y = df[target]
+
+    # Treina o modelo
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+
+    # Salva o modelo
+    os.makedirs("/data/modelo", exist_ok=True)
+    joblib.dump(modelo, "/data/modelo/modelo.pkl")
+    print("✅ Modelo treinado e salvo em /data/modelo/modelo.pkl")
+
+
+----------------------------------------
+Arquivo: ./neural_network/training/train_bkp3.py
+----------------------------------------
+##neural_network/training/train.py
+
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import joblib
+import os
+from datetime import datetime
+from shared import config
+
+def treinar_modelo():
+    print("🤖 Iniciando treinamento do modelo...")
+
+    # Carrega os dados
+    df = pd.read_csv(config.CAMINHO_DADOS)
+
+    # Gera as novas features
+    df["dia"] = pd.to_datetime(df["open_time"]).dt.dayofyear
+    df["media"] = (df["high"] + df["low"]) / 2
+    df["var_percent"] = ((df["high"] - df["low"]) / df["open"]) * 100
+
+    # Define as features e variável alvo
+    X = df[["open", "high", "low", "volume", "dia", "media", "var_percent"]]
+    y = df["close"]
+
+    # Treinamento
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+
+    # Gera nome com timestamp
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    nome_arquivo = f"modelo_{timestamp}.pkl"
+    caminho_modelo = os.path.join(config.DIRETORIO_MODELO, nome_arquivo)
+
+    # Salva o modelo
+    os.makedirs(config.DIRETORIO_MODELO, exist_ok=True)
+    joblib.dump(modelo, caminho_modelo)
+    print(f"✅ Modelo salvo em: {caminho_modelo}")
+
+    # Cria/atualiza o link simbólico
+    link_simbolico = os.path.join(config.DIRETORIO_MODELO, "modelo_mais_recente.pkl")
+    if os.path.islink(link_simbolico) or os.path.exists(link_simbolico):
+        os.remove(link_simbolico)
+    os.symlink(nome_arquivo, link_simbolico)
+    print(f"🔗 Link simbólico criado: {link_simbolico} -> {nome_arquivo}")
+
+
+
+----------------------------------------
+Arquivo: ./neural_network/training/train_linear.py
+----------------------------------------
+##nn/training/train_linear.py
+
+from sklearn.linear_model import LinearRegression
+import joblib, os
+from datetime import datetime
+from shared import config
+from .utils import preparar_dados
+
+def treinar_modelo_linear():
+    X, y = preparar_dados()
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+
+    caminho = os.path.join(config.DIRETORIO_MODELOS, f"linear_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pkl")
+    joblib.dump(modelo, caminho)
+    print(f"✅ Modelo Linear salvo em: {caminho}")
+
+
+----------------------------------------
+Arquivo: ./neural_network/training/train_rf.py
+----------------------------------------
+##nn/training/train_rf.py
+
+from sklearn.ensemble import RandomForestRegressor
+import joblib, os
+from datetime import datetime
+from shared import config
+from .utils import preparar_dados
+
+def treinar_modelo_rf():
+    X, y = preparar_dados()
+    modelo = RandomForestRegressor(n_estimators=100, random_state=42)
+    modelo.fit(X, y)
+
+    caminho = os.path.join(config.DIRETORIO_MODELOS, f"rf_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pkl")
+    joblib.dump(modelo, caminho)
+    print(f"✅ Modelo RF salvo em: {caminho}")
+
+
+----------------------------------------
+Arquivo: ./neural_network/training/train_xgb.py
+----------------------------------------
+from xgboost import XGBRegressor
+import joblib, os
+from datetime import datetime
+from shared import config
+from .utils import preparar_dados
+
+def treinar_modelo_xgb():
+    X, y = preparar_dados()
+    modelo = XGBRegressor(n_estimators=100, random_state=42)
+    modelo.fit(X, y)
+
+    caminho = os.path.join(config.DIRETORIO_MODELOS, f"xgb_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pkl")
+    joblib.dump(modelo, caminho)
+    print(f"✅ Modelo XGBoost salvo em: {caminho}")
+
+
+----------------------------------------
+Arquivo: ./neural_network/training/utils.py
+----------------------------------------
+##nn/training/utils.py
+
+import pandas as pd
+from shared import config
+
+def preparar_dados():
+    df = pd.read_csv(config.CAMINHO_DADOS)
+
+    df["dia"] = pd.to_datetime(df["open_time"]).dt.dayofyear
+    df["media"] = (df["high"] + df["low"]) / 2
+    df["var_percent"] = ((df["high"] - df["low"]) / df["open"]) * 100
+    df["target"] = df["close"].shift(-config.ANTECEDENCIA_CANDLES)
+    df.dropna(inplace=True)
+
+    X = df[["open", "high", "low", "volume", "dia", "media", "var_percent"]]
+    y = df["target"]
+    return X, y
+
+
+
+
+----------------------------------------
+Arquivo: ./neural_network/training/treinar_linear.py
+----------------------------------------
+##neural_network/training/train_linear.py
+
+import pandas as pd
+import joblib
+from sklearn.linear_model import LinearRegression
+from shared.market_data import carregar_candles
+import os
+
+MODELOS_DIR = "/data/modelos"
+os.makedirs(MODELOS_DIR, exist_ok=True)
+
+def treinar_linear():
+    df = carregar_candles(limit=5000)
+
+    df["return"] = df["close"].pct_change()
+    df.dropna(inplace=True)
+
+    X = df[["open", "high", "low", "close", "volume", "return"]]
+    y = df["close"].shift(-1).dropna()
+    X = X.iloc[:-1]
+
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+
+    caminho = os.path.join(MODELOS_DIR, "linear_regression.pkl")
+    joblib.dump(modelo, caminho)
+
+    print(f"Modelo salvo em: {caminho}")
+
+
+if __name__ == "__main__":
+    treinar_linear()
+
+
+----------------------------------------
+Arquivo: ./neural_network/Dockerfile
+----------------------------------------
+FROM python:3.11-slim
+WORKDIR /app
+COPY ./training /app
+RUN pip install --no-cache-dir scikit-learn pandas numpy
+CMD ["python", "train.py"]
+
+
+----------------------------------------
+Arquivo: ./neural_network/models/__init__.py
+----------------------------------------
+# Models NN init
+
+----------------------------------------
+Arquivo: ./neural_network/models/models.py
+----------------------------------------
+from sqlalchemy import Column, Integer, String, Float
+from app.services.database import Base
+
+class TradeModel(Base):
+    __tablename__ = "trades"
+
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String)
+    prediction = Column(Float)
+
+
+----------------------------------------
+Arquivo: ./neural_network/inference/predict.py
+----------------------------------------
+# nn/inference/predict.py
+
+import numpy as np
+import joblib
+import os
+import glob
+import pandas as pd
+from shared.market_data import carregar_candles
+
+# Caminho padrão para modelos
+MODELOS_DIR = "/data/modelos"
+
+
+# ----------------------------------------------------
+# CARREGAR MODELOS
+# ----------------------------------------------------
+def carregar_modelos():
+    modelos = {}
+    arquivos = glob.glob(os.path.join(MODELOS_DIR, "*.pkl"))
+
+    for caminho in arquivos:
+        nome = os.path.basename(caminho).replace(".pkl", "")
+        modelos[nome] = joblib.load(caminho)
+
+    return modelos
+
+
+# ----------------------------------------------------
+# PREVER PREÇO
+# ----------------------------------------------------
+def prever():
+    # LER DADOS DO POSTGRES
+    df = carregar_candles(limit=200)
+
+    # CRIA FEATURES SIMPLES (você pode expandir isso depois)
+    df["return"] = df["close"].pct_change()
+    df.dropna(inplace=True)
+
+    X = df[["open", "high", "low", "close", "volume", "return"]].values[-1].reshape(1, -1)
+
+    modelos = carregar_modelos()
+    previsoes = {}
+
+    for nome, modelo in modelos.items():
+        previsoes[nome] = float(modelo.predict(X)[0])
+
+    media_previsoes = np.mean(list(previsoes.values()))
+
+    return float(media_previsoes), previsoes
+
+
+----------------------------------------
+Arquivo: ./neural_network/requirements_nueral_network.txt
+----------------------------------------
+scikit-learn==1.5.0
+xgboost==2.0.3
+pandas==2.2.2
+joblib==1.4.2
+

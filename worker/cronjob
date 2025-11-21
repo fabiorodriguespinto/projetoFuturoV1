@@ -1,3 +1,0 @@
-*/10 * * * * root python /app/main.py >> /app/cron.log 2>&1
-0 2 * * * root python /app/main.py >> /var/log/worker.log 2>&1
-

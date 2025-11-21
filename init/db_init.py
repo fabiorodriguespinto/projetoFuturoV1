@@ -1,29 +1,29 @@
-import sqlite3
-import os
+# init/db_init.py
 
-# Caminho do banco de dados — deve coincidir com o volume mapeado em docker-compose
-DB_PATH = "/app/data/trades.db"
+from shared.database import init_db
+from shared.database import engine
+import time
 
-# Criação da pasta se não existir (caso esteja em volume compartilhado)
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+def inicializar_banco():
+    print("Aguardando o PostgreSQL ficar pronto...")
 
-# Conecta (cria o arquivo se ainda não existir)
-conn = sqlite3.connect(DB_PATH)
-cursor = conn.cursor()
+    # aguarda o postgres estar acessível
+    for i in range(10):
+        try:
+            with engine.connect() as conn:
+                print("PostgreSQL conectado!")
+                break
+        except:
+            print("Tentativa", i+1, "/ 10 - PostgreSQL ainda não está pronto...")
+            time.sleep(3)
 
-# Cria tabela de forma idempotente
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS trades (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    symbol TEXT NOT NULL,
-    price REAL NOT NULL,
-    quantity REAL NOT NULL,
-    timestamp TEXT NOT NULL
-);
-""")
+    print("Criando tabelas...")
+    init_db()
+    print("Tabelas criadas com sucesso!")
 
-conn.commit()
-conn.close()
 
-print(f"Banco inicializado em: {DB_PATH}")
+if __name__ == "__main__":
+    inicializar_banco()
+
+
 
